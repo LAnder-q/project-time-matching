@@ -1,0 +1,38 @@
+# ===== Backend =====
+backend/target/
+backend/.idea/
+backend/*.iml
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# ===== Frontend =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Vite timestamp =====
+*.timestamp-*.mjs
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== Env =====
+.env
+.env.local
+.env.*.local

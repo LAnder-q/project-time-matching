@@ -1,0 +1,85 @@
+// 后端统一返回体
+export interface Result<T = unknown> {
+  code: number
+  message: string
+  data: T
+}
+
+// 分页结果
+export interface PageResult<T> {
+  list: T[]
+  total: number
+  pageNum: number
+  pageSize: number
+}
+
+// 人员
+export interface Personnel {
+  id?: number
+  empNo: string
+  name: string
+  position: string
+  skills: string
+  availableStartDate: string
+  availableEndDate: string
+}
+
+// 项目
+export interface Project {
+  id?: number
+  name: string
+  startDate: string
+  endDate: string
+  priority: number
+  requiredPosition: string
+  dailyHours: number
+}
+
+// 分配
+export interface Assignment {
+  id?: number
+  personnelId: number
+  projectId: number
+  startDate: string
+  endDate: string
+  dailyHours: number
+  version?: number
+  operator?: string
+  // 联表展示字段
+  personnelName?: string
+  projectName?: string
+  empNo?: string
+}
+
+// 冲突详情
+export interface ConflictDetail {
+  projectId1: number
+  projectName1: string
+  projectId2: number
+  projectName2: string
+  overlapStart: string
+  overlapEnd: string
+  severity: string
+}
+
+// 冲突结果（按人员分组）
+export interface ConflictResult {
+  personnelId: number
+  personnelName: string
+  empNo: string
+  conflicts: ConflictDetail[]
+}
+
+// 日历事件
+export interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  color: string
+  personnelId: number
+  personnelName: string
+  projectId: number
+  projectName: string
+  dailyHours: number
+}
