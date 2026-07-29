@@ -37,7 +37,19 @@ service.interceptors.response.use(
     return res.data
   },
   (error) => {
-    ElMessage.error(error.message || '网络异常')
+    // 401 未认证：清除 token 并跳转登录页
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('userInfo')
+      localStorage.removeItem('role')
+      ElMessage.error('登录已过期，请重新登录')
+      // 避免在登录页重复跳转
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
+    }
+    ElMessage.error(error.response?.data?.message || error.message || '网络异常')
     return Promise.reject(error)
   }
 )

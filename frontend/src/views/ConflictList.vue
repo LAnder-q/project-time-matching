@@ -1,42 +1,54 @@
 <template>
-  <div class="page-container">
-    <el-card shadow="never">
-      <div class="toolbar">
-        <span class="title">冲突清单</span>
-        <div class="toolbar-actions">
-          <el-button type="success" :icon="Download" @click="exportConflictReport">
-            导出冲突报表
-          </el-button>
-          <el-button type="primary" :loading="loading" @click="loadData">刷新</el-button>
-        </div>
+  <div class="conflict-page">
+    <!-- 页面头部 -->
+    <header class="page-head">
+      <div class="page-head__lead">
+        <h1 class="page-head__title">冲突清单</h1>
+        <p class="page-head__desc">自动检测人员跨项目的时间冲突，并提供替换人员与调整工时等调优建议</p>
       </div>
+      <div class="page-head__aside">
+        <el-button type="primary" :loading="loading" @click="loadData">刷新</el-button>
+        <el-button type="success" :icon="Download" @click="exportConflictReport">
+          导出冲突报表
+        </el-button>
+      </div>
+    </header>
 
-      <el-empty v-if="!loading && conflictList.length === 0" description="暂无冲突" />
+    <!-- 空状态 -->
+    <div v-if="!loading && conflictList.length === 0" class="empty-wrap">
+      <el-empty description="暂无冲突" />
+    </div>
 
-      <div v-loading="loading">
-        <el-card
-          v-for="item in conflictList"
-          :key="item.personnelId"
-          class="conflict-person-card"
-          shadow="hover"
-        >
-          <template #header>
-            <div class="person-header">
+    <!-- 冲突人员列表 -->
+    <div v-loading="loading" class="conflict-list">
+      <article
+        v-for="item in conflictList"
+        :key="item.personnelId"
+        class="conflict-card"
+      >
+        <!-- 卡片头部 -->
+        <div class="conflict-card__head">
+          <div class="conflict-card__identity">
+            <span class="conflict-card__avatar">
               <el-icon><User /></el-icon>
-              <span class="person-name">{{ item.personnelName }}</span>
-              <el-tag type="info">工号：{{ item.empNo }}</el-tag>
-              <el-tag type="danger">冲突 {{ item.conflicts.length }} 项</el-tag>
-              <el-button
-                type="primary"
-                link
-                class="view-calendar"
-                @click="goCalendar(item.personnelId)"
-              >
-                查看日历
-              </el-button>
+            </span>
+            <div class="conflict-card__meta">
+              <div class="conflict-card__name">{{ item.personnelName }}</div>
+              <div class="conflict-card__sub">工号 {{ item.empNo }}</div>
             </div>
-          </template>
+          </div>
+          <div class="conflict-card__badges">
+            <span class="conflict-badge conflict-badge--danger">
+              冲突 {{ item.conflicts.length }} 项
+            </span>
+            <el-button type="primary" link @click="goCalendar(item.personnelId)">
+              查看日历
+            </el-button>
+          </div>
+        </div>
 
+        <!-- 冲突明细表格 -->
+        <div class="conflict-card__body">
           <el-table :data="item.conflicts" border size="small">
             <el-table-column label="项目1" min-width="160">
               <template #default="{ row }">{{ row.projectName1 }}</template>
@@ -58,92 +70,107 @@
               </template>
             </el-table-column>
           </el-table>
+        </div>
 
-          <!-- 调优建议区域 -->
-          <div class="suggestion-area">
-            <el-button
-              type="warning"
-              plain
-              :icon="MagicStick"
-              @click="toggleSuggestion(item.personnelId)"
-            >
-              {{ isExpanded(item.personnelId) ? '收起调优建议' : '查看调优建议' }}
-            </el-button>
+        <!-- 调优建议区域 -->
+        <div class="suggestion-area">
+          <el-button
+            type="warning"
+            plain
+            :icon="MagicStick"
+            @click="toggleSuggestion(item.personnelId)"
+          >
+            {{ isExpanded(item.personnelId) ? '收起调优建议' : '查看调优建议' }}
+          </el-button>
 
-            <el-collapse-transition>
-              <div v-show="isExpanded(item.personnelId)" class="suggestion-panel">
-                <div v-loading="suggestionLoading" class="suggestion-content">
-                  <el-empty
-                    v-if="!suggestionLoading && getPersonnelSuggestions(item.personnelId).length === 0"
-                    description="暂无调优建议"
-                    :image-size="60"
-                  />
+          <el-collapse-transition>
+            <div v-show="isExpanded(item.personnelId)" class="suggestion-panel">
+              <div v-loading="suggestionLoading" class="suggestion-content">
+                <el-empty
+                  v-if="!suggestionLoading && getPersonnelSuggestions(item.personnelId).length === 0"
+                  description="暂无调优建议"
+                  :image-size="60"
+                />
 
-                  <div
-                    v-for="(sug, idx) in getPersonnelSuggestions(item.personnelId)"
-                    :key="idx"
-                    class="suggestion-item"
-                  >
-                    <div class="suggestion-header">
-                      <el-tag :type="suggestionTagType(sug.suggestionType)">
-                        {{ suggestionTypeText(sug.suggestionType) }}
-                      </el-tag>
-                      <span class="suggestion-project">涉及项目：{{ sug.projectName }}</span>
-                    </div>
-
-                    <p class="suggestion-desc">{{ sug.description }}</p>
-
-                    <!-- 替换人员：展示替代候选人列表 -->
-                    <template v-if="sug.suggestionType === 'REPLACE_PERSONNEL'">
-                      <el-table
-                        :data="sug.candidates || []"
-                        border
-                        size="small"
-                        class="candidate-table"
-                      >
-                        <el-table-column label="姓名" prop="name" width="100" />
-                        <el-table-column label="工号" prop="empNo" width="110" />
-                        <el-table-column label="岗位" prop="position" width="120" />
-                        <el-table-column
-                          label="技能"
-                          prop="skills"
-                          min-width="160"
-                          show-overflow-tooltip
-                        />
-                        <el-table-column label="匹配度" width="170" align="center">
-                          <template #default="{ row }">
-                            <el-progress
-                              :percentage="matchPercentage(row.matchScore)"
-                              :color="matchScoreColor(row.matchScore)"
-                            />
-                          </template>
-                        </el-table-column>
-                        <el-table-column
-                          label="推荐理由"
-                          prop="reason"
-                          min-width="200"
-                          show-overflow-tooltip
-                        />
-                      </el-table>
-                    </template>
-
-                    <!-- 调整工时：展示调整建议文字 -->
-                    <template v-else-if="sug.suggestionType === 'ADJUST_HOURS'">
-                      <el-alert
-                        :title="sug.adjustAdvice || '暂无调整建议'"
-                        type="info"
-                        :closable="false"
-                        show-icon
-                      />
-                    </template>
+                <div
+                  v-for="(sug, idx) in getPersonnelSuggestions(item.personnelId)"
+                  :key="idx"
+                  class="suggestion-item"
+                >
+                  <div class="suggestion-header">
+                    <el-tag :type="suggestionTagType(sug.suggestionType)">
+                      {{ suggestionTypeText(sug.suggestionType) }}
+                    </el-tag>
+                    <span class="suggestion-project">涉及项目：{{ sug.projectName }}</span>
                   </div>
+
+                  <p class="suggestion-desc">{{ sug.description }}</p>
+
+                  <!-- 替换人员：展示替代候选人列表 -->
+                  <template v-if="sug.suggestionType === 'REPLACE_PERSONNEL'">
+                    <el-table
+                      :data="sug.candidates || []"
+                      border
+                      size="small"
+                      class="candidate-table"
+                    >
+                      <el-table-column label="推荐档位" width="110" align="center">
+                        <template #default="{ row }">
+                          <el-tag :type="recommendationTagType(row.recommendationLevel)" size="small">
+                            {{ recommendationText(row.recommendationLevel) }}
+                          </el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="姓名" prop="name" width="100" />
+                      <el-table-column label="工号" prop="empNo" width="110" />
+                      <el-table-column label="岗位" prop="position" width="120" />
+                      <el-table-column
+                        label="技能"
+                        prop="skills"
+                        min-width="160"
+                        show-overflow-tooltip
+                      />
+                      <el-table-column label="技能匹配度" width="130" align="center">
+                        <template #default="{ row }">
+                          <el-progress
+                            :percentage="matchPercentage(row.matchScore)"
+                            :color="matchScoreColor(row.matchScore)"
+                          />
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="可用率" width="130" align="center">
+                        <template #default="{ row }">
+                          <el-progress
+                            :percentage="matchPercentage(row.availabilityRate)"
+                            :color="availabilityColor(row.availabilityRate)"
+                          />
+                        </template>
+                      </el-table-column>
+                      <el-table-column
+                        label="推荐理由"
+                        prop="reason"
+                        min-width="200"
+                        show-overflow-tooltip
+                      />
+                    </el-table>
+                  </template>
+
+                  <!-- 调整工时：展示调整建议文字 -->
+                  <template v-else-if="sug.suggestionType === 'ADJUST_HOURS'">
+                    <el-alert
+                      :title="sug.adjustAdvice || '暂无调整建议'"
+                      type="info"
+                      :closable="false"
+                      show-icon
+                    />
+                  </template>
                 </div>
               </div>
-            </el-collapse-transition>
-          </div>
-        </el-card>
-      </div>
-    </el-card>
+            </div>
+          </el-collapse-transition>
+        </div>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -157,8 +184,8 @@ import type { ConflictSuggestion } from '@/api/conflict'
 
 type TagType = '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
 
-// 后端报表导出接口地址
-const EXPORT_CONFLICT_URL = 'http://localhost:8080/api/report/export/conflict'
+// 后端报表导出接口地址（使用相对路径，走 vite 代理）
+const EXPORT_CONFLICT_URL = '/api/report/export/conflict'
 
 const router = useRouter()
 const loading = ref(false)
@@ -212,7 +239,8 @@ function getPersonnelSuggestions(personnelId: number): ConflictSuggestion[] {
 }
 
 function exportConflictReport() {
-  window.open(EXPORT_CONFLICT_URL, '_blank')
+  const token = localStorage.getItem('token') || ''
+  window.open(`${EXPORT_CONFLICT_URL}?token=${encodeURIComponent(token)}`, '_blank')
 }
 
 function goCalendar(personnelId: number) {
@@ -256,96 +284,234 @@ function matchScoreColor(score: number): string {
   return '#f56c6c'
 }
 
+// 推荐档位标签类型
+function recommendationTagType(level: string): TagType {
+  const l = (level || '').toUpperCase()
+  if (l === 'RECOMMENDED') return 'success'
+  if (l === 'CONSIDERABLE') return 'warning'
+  return 'info'
+}
+
+// 推荐档位中文文案
+function recommendationText(level: string): string {
+  const l = (level || '').toUpperCase()
+  if (l === 'RECOMMENDED') return '推荐'
+  if (l === 'CONSIDERABLE') return '可考虑'
+  return '不推荐'
+}
+
+// 可用率进度条颜色
+function availabilityColor(rate: number): string {
+  const normalized = rate > 1 ? rate / 100 : rate
+  if (normalized >= 0.8) return '#67c23a'
+  if (normalized >= 0.5) return '#e6a23c'
+  return '#f56c6c'
+}
+
 onMounted(() => {
   loadData()
 })
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  .toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+.conflict-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
 
-    .title {
-      font-size: 16px;
-      font-weight: 600;
-    }
+/* ---- 页面头部 ---- */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 2px;
 
-    .toolbar-actions {
-      display: flex;
-      gap: 10px;
-    }
+  &__lead {
+    min-width: 0;
   }
 
-  .conflict-person-card {
-    margin-bottom: 16px;
+  &__title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--pw-text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
 
-    .person-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+  &__desc {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--pw-text-secondary);
+    line-height: 1.5;
+    max-width: 560px;
+  }
 
-      .person-name {
-        font-size: 16px;
-        font-weight: 600;
-      }
+  &__aside {
+    flex-shrink: 0;
+    display: flex;
+    gap: 10px;
+  }
+}
 
-      .view-calendar {
-        margin-left: auto;
-      }
+/* ---- 空状态 ---- */
+.empty-wrap {
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+}
+
+/* ---- 冲突人员卡片 ---- */
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.conflict-card {
+  position: relative;
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-left: 4px solid var(--pw-danger);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--pw-transition), border-color var(--pw-transition);
+
+  &:hover {
+    box-shadow: var(--pw-shadow-md);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--pw-border-light);
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  &__avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #fef2f2;
+    color: var(--pw-danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--pw-text-primary);
+    line-height: 1.2;
+  }
+
+  &__sub {
+    font-size: 12px;
+    color: var(--pw-text-secondary);
+  }
+
+  &__badges {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+
+  &__body {
+    padding: 14px 20px 4px;
+  }
+}
+
+.conflict-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &--danger {
+    background: #fef2f2;
+    color: var(--pw-danger);
+  }
+}
+
+/* ---- 调优建议区域 ---- */
+.suggestion-area {
+  padding: 12px 20px 20px;
+
+  .suggestion-panel {
+    margin-top: 14px;
+    background: var(--pw-bg-hover);
+    border: 1px dashed var(--pw-border);
+    border-radius: var(--pw-radius);
+    padding: 16px;
+
+    .suggestion-content {
+      min-height: 40px;
     }
 
-    .suggestion-area {
-      margin-top: 16px;
+    .suggestion-item {
+      padding: 14px;
+      margin-bottom: 12px;
+      background: var(--pw-bg-card);
+      border: 1px solid var(--pw-border-light);
+      border-radius: var(--pw-radius);
+      transition: border-color var(--pw-transition);
 
-      .suggestion-panel {
-        margin-top: 12px;
-        padding: 16px;
-        background-color: #fafafa;
-        border: 1px dashed #dcdfe6;
-        border-radius: 6px;
+      &:hover {
+        border-color: var(--pw-primary-lighter);
+      }
 
-        .suggestion-content {
-          min-height: 40px;
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .suggestion-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+
+        .suggestion-project {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--pw-text-primary);
         }
+      }
 
-        .suggestion-item {
-          padding: 12px;
-          margin-bottom: 12px;
-          background-color: #fff;
-          border: 1px solid #ebeef5;
-          border-radius: 6px;
+      .suggestion-desc {
+        margin: 0 0 12px;
+        font-size: 13px;
+        color: var(--pw-text-regular);
+        line-height: 1.6;
+      }
 
-          &:last-child {
-            margin-bottom: 0;
-          }
-
-          .suggestion-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-
-            .suggestion-project {
-              font-size: 14px;
-              color: #303133;
-            }
-          }
-
-          .suggestion-desc {
-            margin: 0 0 10px;
-            font-size: 14px;
-            color: #606266;
-            line-height: 1.6;
-          }
-
-          .candidate-table {
-            margin-top: 4px;
-          }
-        }
+      .candidate-table {
+        margin-top: 4px;
       }
     }
   }

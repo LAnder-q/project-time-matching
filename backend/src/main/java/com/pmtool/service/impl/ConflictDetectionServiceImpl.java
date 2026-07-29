@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,11 +38,11 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     private final PersonnelService personnelService;
     private final ProjectService projectService;
 
-    /** 项目颜色调色板（用于日历视图区分不同项目） */
+    /** 项目颜色调色板（用于日历视图区分不同项目，不含红色以避免与冲突标记混淆） */
     private static final String[] COLOR_PALETTE = {
-            "#409EFF", "#67C23A", "#E6A23C", "#F56C6C", "#909399",
-            "#9B59B6", "#1ABC9C", "#34495E", "#E67E22", "#2ECC71",
-            "#3498DB", "#95A5A6", "#F39C12", "#C0392B", "#8E44AD"
+            "#409EFF", "#67C23A", "#E6A23C", "#909399", "#9B59B6",
+            "#1ABC9C", "#34495E", "#E67E22", "#2ECC71", "#3498DB",
+            "#95A5A6", "#F39C12", "#8E44AD", "#16A085", "#2980B9"
     };
 
     public ConflictDetectionServiceImpl(AssignmentService assignmentService,
@@ -144,8 +145,41 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     @Override
-    public List<CalendarEvent> getCalendarData() {
-        List<Assignment> allAssignments = assignmentService.list();
+    public List<CalendarEvent> getCalendarData(Long personnelId, Long projectId, LocalDate startDate, LocalDate endDate) {
+        // 按人员筛选
+        List<Assignment> allAssignments;
+        if (personnelId != null) {
+            LambdaQueryWrapper<Assignment> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Assignment::getPersonnelId, personnelId);
+            allAssignments = assignmentService.list(wrapper);
+        } else {
+            allAssignments = assignmentService.list();
+        }
+
+        // 按项目筛选
+        if (projectId != null) {
+            allAssignments = allAssignments.stream()
+                    .filter(a -> projectId.equals(a.getProjectId()))
+                    .collect(Collectors.toList());
+        }
+
+        // 按时间区间筛选（分配区间与筛选区间有交集即保留）
+        if (startDate != null && endDate != null) {
+            allAssignments = allAssignments.stream()
+                    .filter(a -> a.getStartDate() != null && a.getEndDate() != null)
+                    .filter(a -> a.getStartDate().compareTo(endDate) <= 0 && startDate.compareTo(a.getEndDate()) <= 0)
+                    .collect(Collectors.toList());
+        } else if (startDate != null) {
+            allAssignments = allAssignments.stream()
+                    .filter(a -> a.getEndDate() != null)
+                    .filter(a -> a.getEndDate().compareTo(startDate) >= 0)
+                    .collect(Collectors.toList());
+        } else if (endDate != null) {
+            allAssignments = allAssignments.stream()
+                    .filter(a -> a.getStartDate() != null)
+                    .filter(a -> a.getStartDate().compareTo(endDate) <= 0)
+                    .collect(Collectors.toList());
+        }
 
         // 预加载所有人员和项目信息
         Map<Long, Personnel> personnelMap = personnelService.list().stream()
@@ -153,11 +187,13 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
         Map<Long, Project> projectMap = projectService.list().stream()
                 .collect(Collectors.toMap(Project::getId, p -> p));
 
-        // 为每个项目分配颜色
+        // 为每个项目分配颜色（按项目ID排序，保证颜色分配稳定）
         Map<Long, String> projectColorMap = new HashMap<>();
+        List<Long> sortedProjectIds = new ArrayList<>(projectMap.keySet());
+        Collections.sort(sortedProjectIds);
         int colorIndex = 0;
-        for (Long projectId : projectMap.keySet()) {
-            projectColorMap.put(projectId, COLOR_PALETTE[colorIndex % COLOR_PALETTE.length]);
+        for (Long pid : sortedProjectIds) {
+            projectColorMap.put(pid, COLOR_PALETTE[colorIndex % COLOR_PALETTE.length]);
             colorIndex++;
         }
 
@@ -264,9 +300,9 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
                         cd.getOverlapStart(), cd.getOverlapEnd(), higherProject.getName()));
                 suggestions.add(adjustSuggestion);
 
-                // 2.c 查找技能匹配的替代人员（技能重叠且在冲突时间段内可用），生成 REPLACE_PERSONNEL 建议
+                // 2.c 查找技能匹配的替代人员，基于低优先级项目完整周期计算可用率
                 List<ConflictSuggestion.ReplacementCandidate> candidates = findReplacementCandidates(
-                        personnelId, conflictPersonnel, cd.getOverlapStart(), cd.getOverlapEnd(),
+                        personnelId, conflictPersonnel, lowerProject,
                         allPersonnel, allAssignments);
 
                 ConflictSuggestion replaceSuggestion = new ConflictSuggestion();
@@ -301,22 +337,36 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
 
     /**
      * 查找技能匹配的替代人员
-     * 条件：与冲突人员技能存在重叠，且在冲突时间段内可用（无重叠分配且可用日期覆盖冲突时段）
-     * 技能匹配算法：将 skills 按逗号分割成集合，计算交集比例（Jaccard）作为 matchScore
+     * 基于低优先级项目完整周期计算可用率，分三档推荐：
+     * - RECOMMENDED：可用率≥80% 且 匹配度≥50%
+     * - CONSIDERABLE：可用率≥50% 或 匹配度≥30%
+     * - NOT_RECOMMENDED：其余（仍展示但标注不推荐）
      */
     private List<ConflictSuggestion.ReplacementCandidate> findReplacementCandidates(
-            Long conflictPersonnelId, Personnel conflictPersonnel,
-            LocalDate overlapStart, LocalDate overlapEnd,
+            Long conflictPersonnelId, Personnel conflictPersonnel, Project lowerProject,
             List<Personnel> allPersonnel, List<Assignment> allAssignments) {
 
         List<ConflictSuggestion.ReplacementCandidate> candidates = new ArrayList<>();
-        if (conflictPersonnel == null || overlapStart == null || overlapEnd == null) {
+        if (conflictPersonnel == null || lowerProject == null) {
             return candidates;
         }
 
-        // 冲突人员的技能集合
-        Set<String> conflictSkills = parseSkills(conflictPersonnel.getSkills());
-        if (conflictSkills.isEmpty()) {
+        // 构建技能要求集：冲突人员技能 + 项目所需岗位，取并集
+        Set<String> requiredSkills = parseSkills(conflictPersonnel.getSkills());
+        Set<String> positionSkills = parseSkills(lowerProject.getRequiredPosition());
+        requiredSkills.addAll(positionSkills);
+        if (requiredSkills.isEmpty()) {
+            return candidates;
+        }
+
+        // 低优先级项目的完整周期
+        LocalDate projectStart = lowerProject.getStartDate();
+        LocalDate projectEnd = lowerProject.getEndDate();
+        if (projectStart == null || projectEnd == null) {
+            return candidates;
+        }
+        long projectTotalDays = ChronoUnit.DAYS.between(projectStart, projectEnd) + 1;
+        if (projectTotalDays <= 0) {
             return candidates;
         }
 
@@ -326,16 +376,25 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
                 continue;
             }
 
-            // 2.d 技能匹配算法：计算交集比例
+            // 技能匹配算法：计算交集比例
             Set<String> candidateSkills = parseSkills(candidate.getSkills());
-            double matchScore = calculateMatchScore(conflictSkills, candidateSkills);
+            double matchScore = calculateMatchScore(requiredSkills, candidateSkills);
             if (matchScore <= 0) {
                 continue;  // 无技能交集，跳过
             }
 
-            // 校验在冲突时间段内可用
-            if (!isAvailable(candidate, overlapStart, overlapEnd, allAssignments)) {
-                continue;
+            // 计算在项目周期内的可用率
+            double availabilityRate = calculateAvailabilityRate(
+                    candidate, projectStart, projectEnd, projectTotalDays, allAssignments);
+
+            // 确定推荐档位
+            String recommendationLevel;
+            if (availabilityRate >= 80 && matchScore >= 50) {
+                recommendationLevel = "RECOMMENDED";
+            } else if (availabilityRate >= 50 || matchScore >= 30) {
+                recommendationLevel = "CONSIDERABLE";
+            } else {
+                recommendationLevel = "NOT_RECOMMENDED";
             }
 
             ConflictSuggestion.ReplacementCandidate rc = new ConflictSuggestion.ReplacementCandidate();
@@ -345,14 +404,27 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             rc.setPosition(candidate.getPosition());
             rc.setSkills(candidate.getSkills());
             rc.setMatchScore(matchScore);
-            rc.setReason(String.format("技能匹配度 %.0f%%，在冲突时段（%s 至 %s）可用",
-                    matchScore, overlapStart, overlapEnd));
+            rc.setAvailabilityRate(availabilityRate);
+            rc.setRecommendationLevel(recommendationLevel);
+            rc.setReason(String.format("技能匹配度 %.0f%%，项目周期内可用率 %.0f%%（%s 至 %s）",
+                    matchScore, availabilityRate, projectStart, projectEnd));
             candidates.add(rc);
         }
 
-        // 按匹配度从高到低排序
-        candidates.sort((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()));
+        // 排序：推荐 > 可考虑 > 不推荐，同档位内按可用率降序
+        candidates.sort((a, b) -> {
+            int levelOrder = levelOrder(a.getRecommendationLevel()) - levelOrder(b.getRecommendationLevel());
+            if (levelOrder != 0) return levelOrder;
+            return Double.compare(b.getAvailabilityRate(), a.getAvailabilityRate());
+        });
         return candidates;
+    }
+
+    /** 推荐档位排序权重 */
+    private int levelOrder(String level) {
+        if ("RECOMMENDED".equals(level)) return 0;
+        if ("CONSIDERABLE".equals(level)) return 1;
+        return 2;
     }
 
     /**
@@ -390,12 +462,15 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     /**
-     * 判断候选人在指定时间段内是否可用
-     * 可用条件：1) 无任何分配记录与该时间段重叠；2) 可用日期范围覆盖该时间段（如已设置）
+     * 计算候选人在项目周期内的可用率（0-100）
+     * 可用率 = 空闲天数 / 项目总天数 × 100
+     * 空闲天数 = 项目总天数 - 与其他分配重叠的天数 - 不可用日期覆盖的天数
      */
-    private boolean isAvailable(Personnel candidate, LocalDate start, LocalDate end,
-                                List<Assignment> allAssignments) {
-        // 1. 校验不存在与冲突时段重叠的分配记录
+    private double calculateAvailabilityRate(Personnel candidate, LocalDate projectStart, LocalDate projectEnd,
+                                              long projectTotalDays, List<Assignment> allAssignments) {
+        long occupiedDays = 0;
+
+        // 统计与项目周期重叠的已分配天数
         for (Assignment a : allAssignments) {
             if (!candidate.getId().equals(a.getPersonnelId())) {
                 continue;
@@ -403,22 +478,35 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             if (a.getStartDate() == null || a.getEndDate() == null) {
                 continue;
             }
-            // 区间重叠判断：start1 <= end2 && start2 <= end1
-            if (a.getStartDate().compareTo(end) <= 0 && start.compareTo(a.getEndDate()) <= 0) {
-                return false;
+            // 计算重叠区间
+            LocalDate overlapStart = a.getStartDate().isAfter(projectStart) ? a.getStartDate() : projectStart;
+            LocalDate overlapEnd = a.getEndDate().isBefore(projectEnd) ? a.getEndDate() : projectEnd;
+            if (overlapStart.compareTo(overlapEnd) <= 0) {
+                occupiedDays += ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
             }
         }
 
-        // 2. 校验可用日期范围覆盖冲突时段（如已设置可用日期）
+        // 校验可用日期范围（如已设置）
         if (candidate.getAvailableStartDate() != null
-                && candidate.getAvailableStartDate().isAfter(start)) {
-            return false;
+                && candidate.getAvailableStartDate().isAfter(projectStart)) {
+            LocalDate availStart = candidate.getAvailableStartDate();
+            if (availStart.compareTo(projectEnd) <= 0) {
+                occupiedDays += ChronoUnit.DAYS.between(projectStart,
+                        availStart.isBefore(projectEnd) ? availStart.minusDays(1) : projectEnd) + 1;
+            }
         }
         if (candidate.getAvailableEndDate() != null
-                && candidate.getAvailableEndDate().isBefore(end)) {
-            return false;
+                && candidate.getAvailableEndDate().isBefore(projectEnd)) {
+            LocalDate availEnd = candidate.getAvailableEndDate();
+            if (availEnd.compareTo(projectStart) >= 0) {
+                occupiedDays += ChronoUnit.DAYS.between(
+                        availEnd.isAfter(projectStart) ? availEnd.plusDays(1) : projectStart, projectEnd) + 1;
+            }
         }
-        return true;
+
+        long availableDays = projectTotalDays - occupiedDays;
+        if (availableDays < 0) availableDays = 0;
+        return availableDays * 100.0 / projectTotalDays;
     }
 
     /**

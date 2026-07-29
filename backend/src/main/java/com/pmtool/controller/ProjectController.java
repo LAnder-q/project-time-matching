@@ -74,4 +74,12 @@ public class ProjectController {
         projectService.removeById(id);
         return Result.ok(null);
     }
+
+    /**
+     * 批量导入项目（项目名存在则更新，不存在则新增）
+     */
+    @PostMapping("/batch")
+    public Result<List<Project>> batchImport(@RequestBody List<Project> projectList) {
+        return Result.ok(projectService.importProjects(projectList));
+    }
 }

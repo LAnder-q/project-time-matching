@@ -34,3 +34,7 @@ export function updateProject(id: number, data: Partial<Project>): Promise<Proje
 export function deleteProject(id: number): Promise<void> {
   return http.delete<void>(`/project/${id}`)
 }
+
+export function batchImportProjects(data: Partial<Project>[]): Promise<Project[]> {
+  return http.post<Project[]>('/project/batch', data)
+}

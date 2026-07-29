@@ -1,7 +1,20 @@
 <template>
-  <div class="page-container">
-    <el-card shadow="never">
-      <div class="toolbar">
+  <div class="assignment-page">
+    <!-- 页面头部 -->
+    <header class="page-head">
+      <div class="page-head__lead">
+        <h1 class="page-head__title">分配管理</h1>
+        <p class="page-head__desc">管理人员与项目的时间分配记录，支持按人员或项目维度筛选</p>
+      </div>
+      <div class="page-head__aside">
+        <el-button type="primary" @click="handleAdd">新增分配</el-button>
+      </div>
+    </header>
+
+    <!-- 筛选工具栏 -->
+    <section class="filter-bar">
+      <div class="filter-bar__group">
+        <span class="filter-bar__label">筛选</span>
         <el-select
           v-model="filterPersonnelId"
           placeholder="按人员筛选"
@@ -25,9 +38,14 @@
         >
           <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id!" />
         </el-select>
-        <el-button type="success" @click="handleAdd">新增分配</el-button>
       </div>
+      <div class="filter-bar__meta">
+        共 <strong>{{ tableData.length }}</strong> 条分配记录
+      </div>
+    </section>
 
+    <!-- 数据表格 -->
+    <section class="table-panel">
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="personnelName" label="人员姓名" width="140">
@@ -49,7 +67,7 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+    </section>
 
     <el-dialog
       v-model="dialogVisible"
@@ -247,11 +265,94 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  .toolbar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
+.assignment-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---- 页面头部 ---- */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 2px;
+
+  &__lead {
+    min-width: 0;
   }
+
+  &__title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--pw-text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  &__desc {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--pw-text-secondary);
+    line-height: 1.5;
+  }
+
+  &__aside {
+    flex-shrink: 0;
+  }
+}
+
+/* ---- 筛选工具栏 ---- */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  padding: 14px 18px;
+  box-shadow: var(--pw-shadow-sm);
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--pw-text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding-right: 4px;
+    border-right: 1px solid var(--pw-border);
+    margin-right: 2px;
+  }
+
+  &__meta {
+    font-size: 13px;
+    color: var(--pw-text-secondary);
+
+    strong {
+      color: var(--pw-primary);
+      font-weight: 700;
+      font-size: 15px;
+      margin: 0 3px;
+    }
+  }
+}
+
+/* ---- 表格面板 ---- */
+.table-panel {
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+  padding: 14px 16px;
 }
 </style>

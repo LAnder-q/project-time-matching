@@ -24,6 +24,8 @@ public class ConflictSuggestion {
         private String position;
         private String skills;
         private Double matchScore;  // 技能匹配度 0-100
+        private Double availabilityRate;  // 可用率 0-100（项目周期内空闲天数占比）
+        private String recommendationLevel;  // 推荐档位：RECOMMENDED / CONSIDERABLE / NOT_RECOMMENDED
         private String reason;  // 推荐理由
     }
 }

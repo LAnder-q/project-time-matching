@@ -1,24 +1,32 @@
 <template>
   <div class="page-container">
-    <el-card shadow="never">
-      <div class="toolbar">
-        <el-input
-          v-model="keyword"
-          placeholder="按姓名/工号搜索"
-          clearable
-          style="width: 240px"
-          @keyup.enter="handleSearch"
-          @clear="handleSearch"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <el-button type="primary" @click="handleSearch">搜索</el-button>
-        <el-button type="success" @click="handleAdd">新增人员</el-button>
+    <header class="page-header">
+      <div class="page-header__main">
+        <h1 class="page-title">人员管理</h1>
+        <p class="page-subtitle">维护人员基础信息、技能标签与可用档期</p>
       </div>
+    </header>
 
-      <el-table v-loading="loading" :data="tableData" border stripe>
+    <div class="toolbar">
+      <el-input
+        v-model="keyword"
+        placeholder="按姓名 / 工号搜索"
+        clearable
+        class="toolbar__search"
+        @keyup.enter="handleSearch"
+        @clear="handleSearch"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-button @click="handleSearch">搜索</el-button>
+      <div class="toolbar__spacer"></div>
+      <el-button type="primary" @click="handleAdd">新增人员</el-button>
+    </div>
+
+    <div class="table-card">
+      <el-table v-loading="loading" :data="tableData" stripe class="table-card__table">
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="empNo" label="工号" width="120" />
         <el-table-column prop="name" label="姓名" width="120" />
@@ -34,7 +42,7 @@
         </el-table-column>
       </el-table>
 
-      <div class="pagination">
+      <div class="table-footer">
         <el-pagination
           v-model:current-page="pageNum"
           v-model:page-size="pageSize"
@@ -45,7 +53,7 @@
           @current-change="loadData"
         />
       </div>
-    </el-card>
+    </div>
 
     <el-dialog
       v-model="dialogVisible"
@@ -227,16 +235,70 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .page-container {
-  .toolbar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  &__main {
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--pw-text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .page-subtitle {
+      font-size: 13px;
+      color: var(--pw-text-secondary);
+      margin-top: 4px;
+    }
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+
+  &__search {
+    width: 280px;
   }
 
-  .pagination {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
+  &__spacer {
+    flex: 1;
   }
+}
+
+.table-card {
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+  overflow: hidden;
+
+  &__table {
+    width: 100%;
+  }
+}
+
+.table-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 14px 16px;
+  border-top: 1px solid var(--pw-border-light);
+  background: var(--pw-bg-hover);
 }
 </style>

@@ -1,69 +1,117 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20">
-      <el-col :span="6">
-        <StatCard title="总人数" :value="stats.personnelCount" :icon="User" color="#409eff" />
-      </el-col>
-      <el-col :span="6">
-        <StatCard title="项目数" :value="stats.projectCount" :icon="Folder" color="#67c23a" />
-      </el-col>
-      <el-col :span="6">
-        <StatCard
-          title="分配数"
-          :value="stats.assignmentCount"
-          :icon="Connection"
-          color="#e6a23c"
-        />
-      </el-col>
-      <el-col :span="6">
-        <StatCard title="冲突数" :value="stats.conflictCount" :icon="Warning" color="#f56c6c" />
-      </el-col>
-    </el-row>
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <StatCard title="总人数" :value="stats.personnelCount" :icon="User" color="#4f46e5" />
+      <StatCard title="项目数" :value="stats.projectCount" :icon="Folder" color="#059669" />
+      <StatCard title="分配数" :value="stats.assignmentCount" :icon="Connection" color="#d97706" />
+      <StatCard title="冲突数" :value="stats.conflictCount" :icon="Warning" color="#dc2626" />
+    </div>
 
-    <el-card class="welcome-card" shadow="never">
-      <div class="welcome">
-        <h2>欢迎使用人员-项目时间匹配管理工具</h2>
-        <p>
+    <!-- 欢迎区 -->
+    <div class="welcome-section">
+      <div class="welcome-content">
+        <h2 class="welcome-title">欢迎使用资源匹配管理系统</h2>
+        <p class="welcome-desc">
           通过本系统可以管理人员信息、项目信息，进行人员与项目的时间分配，并自动检测时间冲突，辅助管理者合理排期。
         </p>
       </div>
-    </el-card>
+      <div class="welcome-decoration">
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+          <circle cx="60" cy="60" r="56" stroke="#eef2ff" stroke-width="2" stroke-dasharray="8 4" />
+          <circle cx="60" cy="60" r="36" fill="#eef2ff" />
+          <path d="M44 54h32M44 60h32M44 66h20" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" />
+          <circle cx="72" cy="66" r="6" fill="#818cf8" stroke="#fff" stroke-width="2" />
+        </svg>
+      </div>
+    </div>
 
-    <el-card class="export-card" shadow="never">
-      <div class="export-section">
-        <h3>报表导出</h3>
-        <p class="export-tip">点击下方按钮可导出对应的报表文件。</p>
-        <div class="export-buttons">
-          <el-button type="primary" :icon="Download" @click="exportReport('assignment')">
-            导出人员时间分配表
-          </el-button>
-          <el-button type="danger" :icon="Download" @click="exportReport('conflict')">
-            导出冲突报表
-          </el-button>
-          <el-button type="success" :icon="Download" @click="exportReport('utilization')">
-            导出人员利用率统计
-          </el-button>
+    <!-- 报表导出 -->
+    <div class="export-section">
+      <div class="section-header">
+        <div>
+          <h3 class="section-title">报表导出</h3>
+          <p class="section-desc">点击下方按钮可导出对应的报表文件，支持 Excel 和 PDF 两种格式</p>
         </div>
       </div>
-    </el-card>
+
+      <div class="export-grid">
+        <div class="export-card">
+          <div class="export-card__icon export-card__icon--primary">
+            <el-icon :size="22"><Connection /></el-icon>
+          </div>
+          <div class="export-card__info">
+            <div class="export-card__name">人员时间分配表</div>
+            <div class="export-card__desc">人员与项目的时间分配明细</div>
+          </div>
+          <el-dropdown @command="(cmd: string) => exportReport('assignment', cmd as 'xlsx' | 'pdf')">
+            <el-button type="primary" :icon="Download" size="small">
+              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="xlsx">导出 Excel</el-dropdown-item>
+                <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+
+        <div class="export-card">
+          <div class="export-card__icon export-card__icon--danger">
+            <el-icon :size="22"><Warning /></el-icon>
+          </div>
+          <div class="export-card__info">
+            <div class="export-card__name">冲突报表</div>
+            <div class="export-card__desc">人员时间冲突详情汇总</div>
+          </div>
+          <el-dropdown @command="(cmd: string) => exportReport('conflict', cmd as 'xlsx' | 'pdf')">
+            <el-button type="danger" :icon="Download" size="small">
+              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="xlsx">导出 Excel</el-dropdown-item>
+                <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+
+        <div class="export-card">
+          <div class="export-card__icon export-card__icon--success">
+            <el-icon :size="22"><DataAnalysis /></el-icon>
+          </div>
+          <div class="export-card__info">
+            <div class="export-card__name">人员利用率统计</div>
+            <div class="export-card__desc">人员工时利用率分析报告</div>
+          </div>
+          <el-dropdown @command="(cmd: string) => exportReport('utilization', cmd as 'xlsx' | 'pdf')">
+            <el-button type="success" :icon="Download" size="small">
+              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="xlsx">导出 Excel</el-dropdown-item>
+                <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue'
-import { User, Folder, Connection, Warning, Download } from '@element-plus/icons-vue'
+import { User, Folder, Connection, Warning, Download, ArrowDown, DataAnalysis } from '@element-plus/icons-vue'
 import StatCard from '@/components/StatCard.vue'
 import { getPersonnelPage } from '@/api/personnel'
 import { getProjectPage } from '@/api/project'
 import { getAssignmentList } from '@/api/assignment'
 import { detectAllConflicts } from '@/api/conflict'
-
-// 后端报表导出接口基础地址
-const REPORT_BASE_URL = 'http://localhost:8080/api/report/export'
-
-function exportReport(type: 'assignment' | 'conflict' | 'utilization') {
-  window.open(`${REPORT_BASE_URL}/${type}`, '_blank')
-}
+import { exportReport } from '@/api/report'
 
 const stats = reactive({
   personnelCount: 0,
@@ -111,45 +159,170 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .dashboard {
-  .welcome-card {
-    margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-    .welcome {
-      h2 {
-        font-size: 22px;
-        color: #303133;
-        margin-bottom: 12px;
-      }
+/* ---- 统计卡片网格 ---- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
 
-      p {
-        color: #606266;
-        line-height: 1.8;
-      }
+/* ---- 欢迎区 ---- */
+.welcome-section {
+  background: #fff;
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  overflow: hidden;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--pw-primary-lightest) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .welcome-content {
+    position: relative;
+    z-index: 1;
+
+    .welcome-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--pw-text-primary);
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .welcome-desc {
+      font-size: 14px;
+      color: var(--pw-text-regular);
+      line-height: 1.7;
+      max-width: 600px;
     }
   }
 
-  .export-card {
-    margin-top: 20px;
+  .welcome-decoration {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+}
 
-    .export-section {
-      h3 {
-        font-size: 18px;
-        color: #303133;
-        margin: 0 0 8px;
-      }
+/* ---- 报表导出 ---- */
+.export-section {
+  background: #fff;
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  padding: 24px;
 
-      .export-tip {
-        color: #909399;
-        font-size: 13px;
-        margin: 0 0 16px;
-      }
+  .section-header {
+    margin-bottom: 20px;
 
-      .export-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--pw-text-primary);
+      margin-bottom: 4px;
     }
+
+    .section-desc {
+      font-size: 13px;
+      color: var(--pw-text-secondary);
+    }
+  }
+}
+
+.export-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--pw-border-light);
+  border-radius: var(--pw-radius);
+  transition: all var(--pw-transition);
+
+  &:hover {
+    border-color: var(--pw-primary-lighter);
+    background: var(--pw-bg-hover);
+  }
+
+  &__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--pw-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &--primary {
+      background: var(--pw-primary-lightest);
+      color: var(--pw-primary);
+    }
+
+    &--danger {
+      background: #fef2f2;
+      color: var(--pw-danger);
+    }
+
+    &--success {
+      background: #ecfdf5;
+      color: var(--pw-success);
+    }
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+
+    .export-card__name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--pw-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .export-card__desc {
+      font-size: 12px;
+      color: var(--pw-text-secondary);
+    }
+  }
+}
+
+/* ---- 响应式 ---- */
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-decoration {
+    display: none;
   }
 }
 </style>

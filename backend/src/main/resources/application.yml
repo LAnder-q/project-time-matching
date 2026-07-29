@@ -25,3 +25,9 @@ mybatis-plus:
 logging:
   level:
     com.pmtool: debug
+
+# JWT 配置
+jwt:
+  secret: pm-tool-secret-key-2026-for-hs256-algorithm-must-be-long-enough
+  # token 有效期：24小时（毫秒）
+  expiration: 86400000

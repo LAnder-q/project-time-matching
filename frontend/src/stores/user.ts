@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { login as loginApi } from '@/api/auth'
+import type { LoginVO } from '@/types'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref<string>(localStorage.getItem('token') || '')
@@ -23,17 +25,16 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('role', value)
   }
 
-  // 登录（脚手架内置 mock，接入后端后替换为真实接口调用）
+  // 登录：调用后端真实接口
   async function login(payload: { username: string; password: string }): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockToken = 'mock-token-' + Date.now()
-        setToken(mockToken)
-        setUserInfo({ username: payload.username })
-        setRole('admin')
-        resolve()
-      }, 300)
+    const data: LoginVO = await loginApi(payload)
+    setToken(data.token)
+    setUserInfo({
+      userId: data.userId,
+      username: data.username,
+      realName: data.realName
     })
+    setRole(data.role)
   }
 
   function logout() {

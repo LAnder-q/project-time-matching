@@ -1,17 +1,15 @@
 <template>
-  <el-card class="stat-card" shadow="hover">
-    <div class="stat-card__content">
-      <div class="stat-card__icon" :style="{ backgroundColor: color }">
-        <el-icon :size="28" color="#fff">
+  <div class="stat-card" :style="{ '--accent': color }">
+    <div class="stat-card__top">
+      <div class="stat-card__icon-wrap">
+        <el-icon :size="22" color="#fff">
           <component :is="icon" />
         </el-icon>
       </div>
-      <div class="stat-card__info">
-        <div class="stat-card__title">{{ title }}</div>
-        <div class="stat-card__value" :style="{ color }">{{ value }}</div>
-      </div>
+      <div class="stat-card__value">{{ value }}</div>
     </div>
-  </el-card>
+    <div class="stat-card__label">{{ title }}</div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -27,32 +25,65 @@ defineProps<{
 
 <style scoped lang="scss">
 .stat-card {
-  &__content {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+  background: #fff;
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  padding: 20px;
+  transition: all var(--pw-transition);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--pw-transition);
   }
 
-  &__icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 8px;
+  &:hover {
+    box-shadow: var(--pw-shadow-md);
+    transform: translateY(-2px);
+
+    &::before {
+      opacity: 1;
+    }
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  &__icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--pw-radius);
+    background: var(--accent);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }
 
-  &__title {
-    font-size: 14px;
-    color: #909399;
-    margin-bottom: 8px;
+  &__value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--pw-text-primary);
+    letter-spacing: -0.03em;
+    line-height: 1;
   }
 
-  &__value {
-    font-size: 28px;
-    font-weight: 700;
-    line-height: 1;
+  &__label {
+    font-size: 13px;
+    color: var(--pw-text-secondary);
+    font-weight: 500;
   }
 }
 </style>

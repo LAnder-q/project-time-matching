@@ -3,6 +3,7 @@ import type { ConflictResult, CalendarEvent } from '@/types'
 
 export interface CalendarQuery {
   personnelId?: number
+  projectId?: number
   startDate?: string
   endDate?: string
 }
@@ -15,6 +16,8 @@ export interface ReplacementCandidate {
   position: string
   skills: string
   matchScore: number
+  availabilityRate: number
+  recommendationLevel: 'RECOMMENDED' | 'CONSIDERABLE' | 'NOT_RECOMMENDED'
   reason: string
 }
 

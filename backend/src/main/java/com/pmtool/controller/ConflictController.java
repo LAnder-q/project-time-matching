@@ -6,8 +6,10 @@ import com.pmtool.dto.ConflictResult;
 import com.pmtool.dto.ConflictSuggestion;
 import com.pmtool.service.ConflictDetectionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -38,11 +40,15 @@ public class ConflictController {
     }
 
     /**
-     * 获取日历视图数据
+     * 获取日历视图数据（支持按人员、项目、时间区间筛选）
      */
     @GetMapping("/calendar")
-    public Result<List<CalendarEvent>> calendar() {
-        return Result.ok(conflictDetectionService.getCalendarData());
+    public Result<List<CalendarEvent>> calendar(
+            @RequestParam(required = false) Long personnelId,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.ok(conflictDetectionService.getCalendarData(personnelId, projectId, startDate, endDate));
     }
 
     /**

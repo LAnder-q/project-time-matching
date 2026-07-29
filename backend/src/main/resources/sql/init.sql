@@ -90,7 +90,10 @@ CREATE TABLE sys_user (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户表';
 
 -- 初始化管理员账号 (密码: 123456 的 MD5)
-INSERT INTO sys_user (username, password, role, real_name) VALUES ('admin', 'e10adc3949ba59abbe56e057f20f883e', 'ADMIN', '系统管理员');
+INSERT INTO sys_user (username, password, role, real_name) VALUES
+('admin', 'e10adc3949ba59abbe56e057f20f883e', 'ADMIN', '系统管理员'),
+('project_lead', 'e10adc3949ba59abbe56e057f20f883e', 'PROJECT_LEAD', '项目负责人'),
+('operator', 'e10adc3949ba59abbe56e057f20f883e', 'USER', '运维人员');
 
 -- ============================================================
 -- 测试数据

@@ -5,6 +5,15 @@ export interface Result<T = unknown> {
   data: T
 }
 
+// 登录响应
+export interface LoginVO {
+  token: string
+  userId: number
+  username: string
+  realName: string
+  role: string
+}
+
 // 分页结果
 export interface PageResult<T> {
   list: T[]

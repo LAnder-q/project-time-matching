@@ -4,6 +4,7 @@ import com.pmtool.dto.CalendarEvent;
 import com.pmtool.dto.ConflictResult;
 import com.pmtool.dto.ConflictSuggestion;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -32,11 +33,16 @@ public interface ConflictDetectionService {
     ConflictResult detectConflictsByPersonnelId(Long personnelId);
 
     /**
-     * 获取日历视图数据（所有人员分配列表，含项目颜色）
+     * 获取日历视图数据（支持按人员、项目、时间区间筛选）
+     * 所有参数均可选，为 null 时不过滤该维度
      *
+     * @param personnelId 人员ID（可选）
+     * @param projectId   项目ID（可选）
+     * @param startDate   开始日期（可选）
+     * @param endDate     结束日期（可选）
      * @return 日历事件列表
      */
-    List<CalendarEvent> getCalendarData();
+    List<CalendarEvent> getCalendarData(Long personnelId, Long projectId, LocalDate startDate, LocalDate endDate);
 
     /**
      * 基于已检测到的冲突生成调优建议
