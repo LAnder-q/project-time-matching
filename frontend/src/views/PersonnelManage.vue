@@ -3,7 +3,7 @@
     <header class="page-header">
       <div class="page-header__main">
         <h1 class="page-title">人员管理</h1>
-        <p class="page-subtitle">维护人员基础信息、技能标签与可用档期</p>
+        <p class="page-subtitle">维护人员基础信息、技能标签与可用档期，支持批量导入</p>
       </div>
     </header>
 
@@ -22,6 +22,7 @@
       </el-input>
       <el-button @click="handleSearch">搜索</el-button>
       <div class="toolbar__spacer"></div>
+      <el-button @click="handleBatchImport">批量导入</el-button>
       <el-button type="primary" @click="handleAdd">新增人员</el-button>
     </div>
 
@@ -103,6 +104,27 @@
         <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="importDialogVisible" title="批量导入人员" width="680px">
+      <el-alert
+        title="数据格式说明"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 16px"
+      >
+        每行一个人员，字段顺序：工号, 姓名, 职位, 技能(逗号分隔), 可用开始日期, 可用结束日期。日期格式 YYYY-MM-DD。工号已存在则更新。
+      </el-alert>
+      <el-input
+        v-model="importText"
+        type="textarea"
+        :rows="10"
+        placeholder="示例:&#10;EMP001,张伟,运维工程师,Linux,Docker,Kubernetes,2026-01-01,2026-12-31&#10;EMP002,李娜,运维工程师,Linux,Docker,Python,2026-01-01,2026-12-31"
+      />
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="importing" @click="handleImportSubmit">导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -114,7 +136,8 @@ import {
   getPersonnelPage,
   createPersonnel,
   updatePersonnel,
-  deletePersonnel
+  deletePersonnel,
+  batchImportPersonnel
 } from '@/api/personnel'
 import type { Personnel } from '@/types'
 
@@ -129,6 +152,11 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
+
+// 批量导入
+const importDialogVisible = ref(false)
+const importText = ref('')
+const importing = ref(false)
 
 const defaultForm = (): Personnel => ({
   empNo: '',
@@ -226,6 +254,45 @@ async function handleSubmit() {
       submitting.value = false
     }
   })
+}
+
+// 批量导入
+function handleBatchImport() {
+  importText.value = ''
+  importDialogVisible.value = true
+}
+
+async function handleImportSubmit() {
+  if (!importText.value.trim()) {
+    ElMessage.warning('请输入导入数据')
+    return
+  }
+  const lines = importText.value.trim().split('\n').filter((l) => l.trim())
+  const personnelList: Partial<Personnel>[] = []
+  for (const line of lines) {
+    const parts = line.split(',').map((s) => s.trim())
+    if (parts.length < 6) {
+      ElMessage.error(`数据格式错误，每行至少需要6个字段: ${line}`)
+      return
+    }
+    personnelList.push({
+      empNo: parts[0],
+      name: parts[1],
+      position: parts[2],
+      skills: parts.slice(3, -2).join(','),
+      availableStartDate: parts[parts.length - 2],
+      availableEndDate: parts[parts.length - 1]
+    })
+  }
+  importing.value = true
+  try {
+    await batchImportPersonnel(personnelList)
+    ElMessage.success(`成功导入 ${personnelList.length} 条人员数据`)
+    importDialogVisible.value = false
+    loadData()
+  } finally {
+    importing.value = false
+  }
 }
 
 onMounted(() => {

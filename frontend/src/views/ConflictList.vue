@@ -179,13 +179,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Download, MagicStick } from '@element-plus/icons-vue'
 import { detectAllConflicts, getSuggestions } from '@/api/conflict'
+import { exportReport } from '@/api/report'
 import type { ConflictResult } from '@/types'
 import type { ConflictSuggestion } from '@/api/conflict'
 
 type TagType = '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
-
-// 后端报表导出接口地址（使用相对路径，走 vite 代理）
-const EXPORT_CONFLICT_URL = '/api/report/export/conflict'
 
 const router = useRouter()
 const loading = ref(false)
@@ -239,8 +237,7 @@ function getPersonnelSuggestions(personnelId: number): ConflictSuggestion[] {
 }
 
 function exportConflictReport() {
-  const token = localStorage.getItem('token') || ''
-  window.open(`${EXPORT_CONFLICT_URL}?token=${encodeURIComponent(token)}`, '_blank')
+  exportReport('conflict', 'xlsx')
 }
 
 function goCalendar(personnelId: number) {

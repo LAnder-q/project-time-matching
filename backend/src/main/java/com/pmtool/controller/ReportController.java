@@ -2,6 +2,7 @@ package com.pmtool.controller;
 
 import com.alibaba.excel.EasyExcel;
 import com.pmtool.entity.*;
+import com.pmtool.mapper.OperationLogMapper;
 import com.pmtool.service.*;
 import com.pmtool.utils.PdfExportUtils;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,7 +12,10 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/report")
@@ -25,6 +29,8 @@ public class ReportController {
     private AssignmentService assignmentService;
     @Autowired
     private ConflictDetectionService conflictDetectionService;
+    @Autowired
+    private OperationLogMapper operationLogMapper;
 
     // ======================== 人员时间分配表 ========================
 
@@ -37,15 +43,33 @@ public class ReportController {
         // 构建数据
         List<Assignment> assignments = assignmentService.list();
         Map<Long, Personnel> personnelMap = personnelService.list().stream()
-                .collect(java.util.stream.Collectors.toMap(Personnel::getId, p -> p));
+                .collect(Collectors.toMap(Personnel::getId, p -> p));
         Map<Long, Project> projectMap = projectService.list().stream()
-                .collect(java.util.stream.Collectors.toMap(Project::getId, p -> p));
+                .collect(Collectors.toMap(Project::getId, p -> p));
 
-        List<String> headers = Arrays.asList("人员姓名", "工号", "项目名称", "开始日期", "结束日期", "每日工时", "版本号");
+        // 查询所有操作日志，用于统计调整记录
+        List<OperationLog> allLogs = operationLogMapper.selectList(null);
+        Map<Long, List<OperationLog>> logByEntityId = allLogs.stream()
+                .filter(l -> "ASSIGNMENT".equals(l.getEntityType()))
+                .collect(Collectors.groupingBy(OperationLog::getEntityId));
+
+        List<String> headers = Arrays.asList("人员姓名", "工号", "项目名称", "开始日期", "结束日期", "每日工时", "版本号", "调整次数", "调整记录");
         List<List<String>> data = new ArrayList<>();
         for (Assignment a : assignments) {
             Personnel p = personnelMap.get(a.getPersonnelId());
             Project proj = projectMap.get(a.getProjectId());
+
+            // 统计该分配的操作记录
+            List<OperationLog> logs = logByEntityId.getOrDefault(a.getId(), Collections.emptyList());
+            String adjustCount = String.valueOf(logs.size());
+            // 构建调整记录摘要：操作类型 + 操作人 + 操作时间
+            String adjustRecords = logs.stream()
+                    .map(l -> String.format("[%s] %s %s",
+                            l.getAction() != null ? l.getAction() : "",
+                            l.getOperator() != null ? l.getOperator() : "",
+                            l.getOperateTime() != null ? l.getOperateTime().toLocalDate().toString() : ""))
+                    .collect(Collectors.joining("; "));
+
             data.add(Arrays.asList(
                     p != null ? p.getName() : "",
                     p != null ? p.getEmpNo() : "",
@@ -53,7 +77,9 @@ public class ReportController {
                     a.getStartDate() != null ? a.getStartDate().toString() : "",
                     a.getEndDate() != null ? a.getEndDate().toString() : "",
                     a.getDailyHours() != null ? a.getDailyHours().toString() : "",
-                    a.getVersion() != null ? a.getVersion().toString() : ""
+                    a.getVersion() != null ? a.getVersion().toString() : "",
+                    adjustCount,
+                    adjustRecords
             ));
         }
 
@@ -76,10 +102,16 @@ public class ReportController {
 
         List<com.pmtool.dto.ConflictResult> conflicts = conflictDetectionService.detectAllConflicts();
 
-        List<String> headers = Arrays.asList("人员姓名", "工号", "项目1", "项目2", "重叠开始日期", "重叠结束日期", "严重程度");
+        List<String> headers = Arrays.asList("人员姓名", "工号", "项目1", "项目2", "重叠开始日期", "重叠结束日期", "重叠天数", "严重程度", "人员总冲突次数");
         List<List<String>> data = new ArrayList<>();
         for (com.pmtool.dto.ConflictResult cr : conflicts) {
+            int totalConflicts = cr.getConflicts().size();
             for (com.pmtool.dto.ConflictDetail cd : cr.getConflicts()) {
+                // 计算重叠天数
+                long overlapDays = 0;
+                if (cd.getOverlapStart() != null && cd.getOverlapEnd() != null) {
+                    overlapDays = ChronoUnit.DAYS.between(cd.getOverlapStart(), cd.getOverlapEnd()) + 1;
+                }
                 data.add(Arrays.asList(
                         cr.getPersonnelName(),
                         cr.getEmpNo(),
@@ -87,7 +119,9 @@ public class ReportController {
                         cd.getProjectName2(),
                         cd.getOverlapStart() != null ? cd.getOverlapStart().toString() : "",
                         cd.getOverlapEnd() != null ? cd.getOverlapEnd().toString() : "",
-                        cd.getSeverity()
+                        String.valueOf(overlapDays),
+                        cd.getSeverity(),
+                        String.valueOf(totalConflicts)
                 ));
             }
         }
@@ -112,9 +146,16 @@ public class ReportController {
         List<Personnel> personnelList = personnelService.list();
         List<Assignment> assignments = assignmentService.list();
         Map<Long, Project> projectMap = projectService.list().stream()
-                .collect(java.util.stream.Collectors.toMap(Project::getId, p -> p));
+                .collect(Collectors.toMap(Project::getId, p -> p));
 
-        List<String> headers = Arrays.asList("人员姓名", "工号", "岗位", "技能", "分配项目数", "总分配天数", "总工时", "涉及项目列表");
+        // 检测冲突，统计每人冲突次数
+        List<com.pmtool.dto.ConflictResult> conflictResults = conflictDetectionService.detectAllConflicts();
+        Map<Long, Integer> conflictCountMap = new HashMap<>();
+        for (com.pmtool.dto.ConflictResult cr : conflictResults) {
+            conflictCountMap.put(cr.getPersonnelId(), cr.getConflicts().size());
+        }
+
+        List<String> headers = Arrays.asList("人员姓名", "工号", "岗位", "技能", "分配项目数", "总分配天数", "总工时", "工时占比", "冲突次数", "涉及项目列表");
         List<List<String>> data = new ArrayList<>();
         for (Personnel p : personnelList) {
             List<Assignment> pAssignments = assignments.stream()
@@ -125,13 +166,27 @@ public class ReportController {
             Set<String> projectNames = new LinkedHashSet<>();
             for (Assignment a : pAssignments) {
                 if (a.getStartDate() != null && a.getEndDate() != null) {
-                    long days = java.time.temporal.ChronoUnit.DAYS.between(a.getStartDate(), a.getEndDate()) + 1;
+                    long days = ChronoUnit.DAYS.between(a.getStartDate(), a.getEndDate()) + 1;
                     totalDays += days;
                     totalHours += days * (a.getDailyHours() != null ? a.getDailyHours().doubleValue() : 0);
                 }
                 Project proj = projectMap.get(a.getProjectId());
                 if (proj != null) projectNames.add(proj.getName());
             }
+
+            // 计算工时占比：总工时 / 可用周期内标准工时（按可用日期范围计算）
+            String utilizationRate = "0%";
+            if (p.getAvailableStartDate() != null && p.getAvailableEndDate() != null) {
+                long availableDays = ChronoUnit.DAYS.between(p.getAvailableStartDate(), p.getAvailableEndDate()) + 1;
+                if (availableDays > 0) {
+                    double standardHours = availableDays * 8.0; // 每天8小时标准工时
+                    double rate = totalHours / standardHours * 100;
+                    utilizationRate = String.format("%.1f%%", Math.min(rate, 999.9));
+                }
+            }
+
+            int conflictCount = conflictCountMap.getOrDefault(p.getId(), 0);
+
             data.add(Arrays.asList(
                     p.getName(),
                     p.getEmpNo(),
@@ -140,6 +195,8 @@ public class ReportController {
                     String.valueOf(pAssignments.size()),
                     String.valueOf(totalDays),
                     String.valueOf(totalHours),
+                    utilizationRate,
+                    String.valueOf(conflictCount),
                     String.join(", ", projectNames)
             ));
         }

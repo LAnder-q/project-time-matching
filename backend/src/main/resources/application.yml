@@ -31,3 +31,8 @@ jwt:
   secret: pm-tool-secret-key-2026-for-hs256-algorithm-must-be-long-enough
   # token 有效期：24小时（毫秒）
   expiration: 86400000
+
+# 数据加密配置（AES 对称加密，用于敏感字段加密存储）
+data:
+  encrypt:
+    key: pm-tool-data-encrypt-key-2026
