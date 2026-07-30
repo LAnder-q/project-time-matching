@@ -54,9 +54,21 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     @Override
-    public List<ConflictResult> detectAllConflicts() {
+    public List<ConflictResult> detectAllConflicts(Long deptId) {
         // 查询所有分配记录
         List<Assignment> allAssignments = assignmentService.list();
+
+        // 若指定部门，先查出该部门下所有人员ID，用于过滤分配记录
+        if (deptId != null) {
+            Set<Long> deptPersonnelIds = personnelService.list().stream()
+                    .filter(p -> deptId.equals(p.getDeptId()))
+                    .map(Personnel::getId)
+                    .collect(Collectors.toSet());
+            allAssignments = allAssignments.stream()
+                    .filter(a -> deptPersonnelIds.contains(a.getPersonnelId()))
+                    .collect(Collectors.toList());
+        }
+
         // 按 personnel_id 分组
         Map<Long, List<Assignment>> grouped = allAssignments.stream()
                 .collect(Collectors.groupingBy(Assignment::getPersonnelId));
@@ -145,7 +157,16 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     @Override
-    public List<CalendarEvent> getCalendarData(Long personnelId, Long projectId, LocalDate startDate, LocalDate endDate) {
+    public List<CalendarEvent> getCalendarData(Long personnelId, Long projectId, Long deptId, LocalDate startDate, LocalDate endDate) {
+        // 若指定部门，先查出该部门下所有人员ID，用于过滤分配记录
+        Set<Long> deptPersonnelIds = null;
+        if (deptId != null) {
+            deptPersonnelIds = personnelService.list().stream()
+                    .filter(p -> deptId.equals(p.getDeptId()))
+                    .map(Personnel::getId)
+                    .collect(Collectors.toSet());
+        }
+
         // 按人员筛选
         List<Assignment> allAssignments;
         if (personnelId != null) {
@@ -154,6 +175,14 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             allAssignments = assignmentService.list(wrapper);
         } else {
             allAssignments = assignmentService.list();
+        }
+
+        // 按部门筛选
+        if (deptPersonnelIds != null) {
+            final Set<Long> finalDeptIds = deptPersonnelIds;
+            allAssignments = allAssignments.stream()
+                    .filter(a -> finalDeptIds.contains(a.getPersonnelId()))
+                    .collect(Collectors.toList());
         }
 
         // 按项目筛选
@@ -227,9 +256,9 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     @Override
-    public List<ConflictSuggestion> generateSuggestions() {
-        // 1. 调用 detectAllConflicts() 获取所有冲突
-        List<ConflictResult> conflictResults = detectAllConflicts();
+    public List<ConflictSuggestion> generateSuggestions(Long deptId) {
+        // 1. 调用 detectAllConflicts() 获取所有冲突（按部门过滤）
+        List<ConflictResult> conflictResults = detectAllConflicts(deptId);
         List<ConflictSuggestion> suggestions = new ArrayList<>();
 
         if (conflictResults == null || conflictResults.isEmpty()) {
@@ -351,10 +380,8 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             return candidates;
         }
 
-        // 构建技能要求集：冲突人员技能 + 项目所需岗位，取并集
+        // 构建技能要求集：取冲突人员技能（项目已取消所需岗位字段，人员身兼数职不再按岗位硬过滤）
         Set<String> requiredSkills = parseSkills(conflictPersonnel.getSkills());
-        Set<String> positionSkills = parseSkills(lowerProject.getRequiredPosition());
-        requiredSkills.addAll(positionSkills);
         if (requiredSkills.isEmpty()) {
             return candidates;
         }
@@ -401,7 +428,7 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             rc.setPersonnelId(candidate.getId());
             rc.setName(candidate.getName());
             rc.setEmpNo(candidate.getEmpNo());
-            rc.setPosition(candidate.getPosition());
+            rc.setPosition(candidate.getPositions());
             rc.setSkills(candidate.getSkills());
             rc.setMatchScore(matchScore);
             rc.setAvailabilityRate(availabilityRate);

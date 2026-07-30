@@ -13,6 +13,17 @@
     <!-- 工具栏：白色圆角条，非 el-card -->
     <div class="toolbar">
       <div class="toolbar__filters">
+        <el-tree-select
+          v-model="selectedDeptId"
+          :data="deptTreeData"
+          :props="{ label: 'name', value: 'id', children: 'children' }"
+          check-strictly
+          clearable
+          placeholder="按部门筛选"
+          class="toolbar__select"
+          @change="loadCalendar"
+        />
+
         <el-select
           v-model="selectedPersonnelId"
           placeholder="选择人员（全部）"
@@ -58,12 +69,6 @@
       </div>
 
       <div class="toolbar__actions">
-        <el-radio-group v-model="calendarView" @change="changeView">
-          <el-radio-button value="timeGridDay">日</el-radio-button>
-          <el-radio-button value="timeGridWeek">周</el-radio-button>
-          <el-radio-button value="dayGridMonth">月</el-radio-button>
-        </el-radio-group>
-
         <transition name="tag-fade">
           <span v-if="conflictAssignmentKeys.size > 0" class="conflict-badge">
             <span class="conflict-badge__dot"></span>
@@ -192,16 +197,18 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn'
 import { getCalendarData, detectAllConflicts } from '@/api/conflict'
 import { getPersonnelAll } from '@/api/personnel'
 import { getProjectAll } from '@/api/project'
+import { getDepartmentTree, type DepartmentVO } from '@/api/department'
 import type { Personnel, Project, CalendarEvent } from '@/types'
 
 const route = useRoute()
 const calendarRef = ref<InstanceType<typeof FullCalendar>>()
 const personnelOptions = ref<Personnel[]>([])
 const projectOptions = ref<Project[]>([])
+const deptTreeData = ref<DepartmentVO[]>([])
 const selectedPersonnelId = ref<number | undefined>(undefined)
 const selectedProjectId = ref<number | undefined>(undefined)
+const selectedDeptId = ref<number | undefined>(undefined)
 const dateRange = ref<[string, string] | undefined>(undefined)
-const calendarView = ref('dayGridMonth')
 const calendarEvents = ref<CalendarEvent[]>([])
 const conflictAssignmentKeys = reactive(new Set<string>())
 const detailVisible = ref(false)
@@ -213,7 +220,17 @@ const calendarOptions = reactive<CalendarOptions>({
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
-    right: ''
+    // 日 / 周 / 月 / 年 四个视图切换按钮
+    right: 'timeGridDay,timeGridWeek,dayGridMonth,dayGridYear'
+  },
+  // 自定义视图：年视图 = dayGrid 模式 + duration 1 年
+  // buttonText（日/周/月/年）由 zh-cn locale 内置提供，无需重复配置
+  views: {
+    dayGridYear: {
+      type: 'dayGrid',
+      duration: { years: 1 },
+      titleFormat: { year: 'numeric' }
+    }
   },
   locale: zhCnLocale,
   height: 700,
@@ -262,6 +279,11 @@ async function loadPersonnel() {
   } catch {
     projectOptions.value = []
   }
+  try {
+    deptTreeData.value = await getDepartmentTree()
+  } catch {
+    deptTreeData.value = []
+  }
   const queryId = route.query.personnelId
   if (queryId) {
     selectedPersonnelId.value = Number(queryId)
@@ -288,12 +310,17 @@ async function loadCalendar() {
     const data = await getCalendarData({
       personnelId: selectedPersonnelId.value,
       projectId: selectedProjectId.value,
+      deptId: selectedDeptId.value,
       startDate: dateRange.value?.[0],
       endDate: dateRange.value?.[1]
     })
     calendarEvents.value = data
     const api = getApi()
     if (api) {
+      // 选了日期区间时，自动跳转到区间起始日期，避免视图仍停留在原月份
+      if (dateRange.value?.[0]) {
+        api.gotoDate(dateRange.value[0])
+      }
       api.removeAllEvents()
       buildEventInputs(data).forEach((ev) => api.addEvent(ev))
     } else {
@@ -306,11 +333,6 @@ async function loadCalendar() {
       api.removeAllEvents()
     }
   }
-}
-
-function changeView(view: string) {
-  const api = getApi()
-  api?.changeView(view)
 }
 
 onMounted(async () => {

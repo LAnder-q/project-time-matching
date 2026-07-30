@@ -22,6 +22,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '人员管理', roles: ['ADMIN', 'PROJECT_LEAD'] }
       },
       {
+        path: 'department',
+        name: 'DepartmentManage',
+        component: () => import('@/views/DepartmentManage.vue'),
+        meta: { title: '部门管理', roles: ['ADMIN'] }
+      },
+      {
         path: 'project',
         name: 'ProjectManage',
         component: () => import('@/views/ProjectManage.vue'),

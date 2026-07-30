@@ -15,15 +15,28 @@
     <section class="filter-bar">
       <div class="filter-bar__group">
         <span class="filter-bar__label">筛选</span>
+        <el-tree-select
+          v-model="filterDeptId"
+          :data="deptTreeData"
+          :props="{ label: 'name', value: 'id', children: 'children' }"
+          check-strictly
+          clearable
+          placeholder="按部门筛选"
+          class="filter-bar__dept"
+          @change="onFilterDeptChange"
+        />
         <el-select
           v-model="filterPersonnelId"
           placeholder="按人员筛选"
           clearable
+          filterable
+          :filter-method="filterPersonnel"
           style="width: 200px"
           @change="loadData"
+          @visible-change="onPersonnelSelectClose"
         >
           <el-option
-            v-for="p in personnelOptions"
+            v-for="p in filteredPersonnelOptions"
             :key="p.id"
             :label="`${p.name} (${p.empNo})`"
             :value="p.id!"
@@ -76,15 +89,29 @@
       @closed="resetForm"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="部门" prop="deptId">
+          <el-tree-select
+            v-model="form.deptId"
+            :data="deptTreeData"
+            :props="{ label: 'name', value: 'id', children: 'children' }"
+            check-strictly
+            clearable
+            placeholder="请选择部门（可缩小人员范围）"
+            style="width: 100%"
+            @change="onFormDeptChange"
+          />
+        </el-form-item>
         <el-form-item label="人员" prop="personnelId">
           <el-select
             v-model="form.personnelId"
             placeholder="请选择人员"
             filterable
+            :filter-method="filterPersonnel"
             style="width: 100%"
+            @visible-change="onPersonnelSelectClose"
           >
             <el-option
-              v-for="p in personnelOptions"
+              v-for="p in formPersonnelOptions"
               :key="p.id"
               :label="`${p.name} (${p.empNo})`"
               :value="p.id!"
@@ -132,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
   getAssignmentList,
@@ -142,6 +169,7 @@ import {
 } from '@/api/assignment'
 import { getPersonnelAll } from '@/api/personnel'
 import { getProjectAll } from '@/api/project'
+import { getDepartmentTree, type DepartmentVO } from '@/api/department'
 import type { Assignment, Personnel, Project } from '@/types'
 
 const loading = ref(false)
@@ -149,6 +177,10 @@ const submitting = ref(false)
 const tableData = ref<Assignment[]>([])
 const personnelOptions = ref<Personnel[]>([])
 const projectOptions = ref<Project[]>([])
+const deptTreeData = ref<DepartmentVO[]>([])
+
+// 顶部筛选：部门 + 人员级联
+const filterDeptId = ref<number | undefined>(undefined)
 const filterPersonnelId = ref<number | undefined>(undefined)
 const filterProjectId = ref<number | undefined>(undefined)
 
@@ -156,15 +188,79 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 
-const defaultForm = (): Assignment => ({
+const defaultForm = (): Assignment & { deptId?: number | null } => ({
   personnelId: undefined as unknown as number,
   projectId: undefined as unknown as number,
   startDate: '',
   endDate: '',
-  dailyHours: 8
+  dailyHours: 8,
+  // 部门仅用于表单内人员筛选联动，不提交后端
+  deptId: undefined
 })
 
-const form = reactive<Assignment>(defaultForm())
+const form = reactive<Assignment & { deptId?: number | null }>(defaultForm())
+
+// 顶部筛选部门变化时：若已选人员不在该部门，则清空人员
+function onFilterDeptChange() {
+  if (
+    filterPersonnelId.value &&
+    !filteredPersonnelOptions.value.some(p => p.id === filterPersonnelId.value)
+  ) {
+    filterPersonnelId.value = undefined
+  }
+  loadData()
+}
+
+// 表单内部门变化时：清空已选人员（避免部门与人员不一致）
+function onFormDeptChange() {
+  form.personnelId = undefined as unknown as number
+}
+
+// 人员下拉自定义搜索：匹配姓名、工号、岗位、技能（不区分大小写）
+// el-select 的 filter-method 接收用户输入值，这里将其存入 ref 触发 computed 重新过滤
+const personnelFilterKeyword = ref('')
+
+function filterPersonnel(val: string) {
+  personnelFilterKeyword.value = (val || '').trim().toLowerCase()
+}
+
+// 下拉关闭时清空搜索关键词，避免下次打开仍处于过滤状态
+function onPersonnelSelectClose(visible: boolean) {
+  if (!visible) {
+    personnelFilterKeyword.value = ''
+  }
+}
+
+// 按关键词匹配人员（姓名 / 工号 / 岗位 / 技能）
+function matchPersonnel(p: Personnel): boolean {
+  const kw = personnelFilterKeyword.value
+  if (!kw) return true
+  const haystack = [
+    p.name || '',
+    p.empNo || '',
+    p.positions || '',
+    p.skills || ''
+  ].join(' ').toLowerCase()
+  return haystack.includes(kw)
+}
+
+// 顶部筛选：按部门 + 关键词双重过滤
+const filteredPersonnelOptions = computed(() => {
+  let list = personnelOptions.value
+  if (filterDeptId.value) {
+    list = list.filter(p => p.deptId === filterDeptId.value)
+  }
+  return list.filter(matchPersonnel)
+})
+
+// 表单内：按部门 + 关键词双重过滤
+const formPersonnelOptions = computed(() => {
+  let list = personnelOptions.value
+  if (form.deptId) {
+    list = list.filter(p => p.deptId === form.deptId)
+  }
+  return list.filter(matchPersonnel)
+})
 
 const rules: FormRules = {
   personnelId: [{ required: true, message: '请选择人员', trigger: 'change' }],
@@ -200,6 +296,11 @@ async function loadOptions() {
   } catch {
     projectOptions.value = []
   }
+  try {
+    deptTreeData.value = await getDepartmentTree()
+  } catch {
+    deptTreeData.value = []
+  }
 }
 
 function handleAdd() {
@@ -211,6 +312,9 @@ function handleAdd() {
 function handleEdit(row: Assignment) {
   isEdit.value = true
   Object.assign(form, defaultForm(), row)
+  // 编辑时根据 personnelId 反查 deptId 回填，便于人员下拉联动展示
+  const p = personnelOptions.value.find(x => x.id === row.personnelId)
+  form.deptId = p?.deptId
   dialogVisible.value = true
 }
 
@@ -243,11 +347,13 @@ async function handleSubmit() {
     if (!valid) return
     submitting.value = true
     try {
+      // 剥除 deptId（仅用于表单内人员筛选联动，不提交后端）
+      const { deptId, ...payload } = form
       if (isEdit.value) {
-        await updateAssignment(form.id!, { ...form })
+        await updateAssignment(form.id!, payload)
         ElMessage.success('修改成功')
       } else {
-        await createAssignment({ ...form })
+        await createAssignment(payload)
         ElMessage.success('新增成功')
       }
       dialogVisible.value = false
@@ -322,7 +428,6 @@ onMounted(() => {
     gap: 12px;
     flex-wrap: wrap;
   }
-
   &__label {
     font-size: 12px;
     font-weight: 600;
@@ -332,6 +437,10 @@ onMounted(() => {
     padding-right: 4px;
     border-right: 1px solid var(--pw-border);
     margin-right: 2px;
+  }
+
+  &__dept {
+    width: 200px;
   }
 
   &__meta {

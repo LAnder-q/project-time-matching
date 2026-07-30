@@ -97,7 +97,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import {
   Odometer, User, Folder, Connection, Warning, Calendar,
-  ArrowDown, Fold, Expand, SwitchButton
+  ArrowDown, Fold, Expand, SwitchButton, OfficeBuilding
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
@@ -112,6 +112,7 @@ const activeMenu = computed(() => route.path)
 const allMenus = [
   { path: '/dashboard', title: '仪表盘', icon: Odometer, roles: ['ADMIN', 'PROJECT_LEAD', 'USER'] },
   { path: '/personnel', title: '人员管理', icon: User, roles: ['ADMIN', 'PROJECT_LEAD'] },
+  { path: '/department', title: '部门管理', icon: OfficeBuilding, roles: ['ADMIN'] },
   { path: '/project', title: '项目管理', icon: Folder, roles: ['ADMIN', 'PROJECT_LEAD'] },
   { path: '/assignment', title: '分配管理', icon: Connection, roles: ['ADMIN', 'PROJECT_LEAD'] },
   { path: '/conflict', title: '冲突清单', icon: Warning, roles: ['ADMIN', 'PROJECT_LEAD', 'USER'] },

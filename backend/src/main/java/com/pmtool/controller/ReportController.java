@@ -37,12 +37,24 @@ public class ReportController {
     @GetMapping("/export/assignment")
     public void exportAssignment(
             @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) Long deptId,
             HttpServletResponse response) throws IOException {
         String title = "人员时间分配表";
 
         // 构建数据
+        List<Personnel> allPersonnel = personnelService.list();
+        // 按部门过滤人员ID集合
+        final Set<Long> allowedPersonnelIds = deptId == null ? null : allPersonnel.stream()
+                .filter(p -> deptId.equals(p.getDeptId()))
+                .map(Personnel::getId)
+                .collect(Collectors.toSet());
         List<Assignment> assignments = assignmentService.list();
-        Map<Long, Personnel> personnelMap = personnelService.list().stream()
+        if (allowedPersonnelIds != null) {
+            assignments = assignments.stream()
+                    .filter(a -> allowedPersonnelIds.contains(a.getPersonnelId()))
+                    .collect(Collectors.toList());
+        }
+        Map<Long, Personnel> personnelMap = allPersonnel.stream()
                 .collect(Collectors.toMap(Personnel::getId, p -> p));
         Map<Long, Project> projectMap = projectService.list().stream()
                 .collect(Collectors.toMap(Project::getId, p -> p));
@@ -97,10 +109,11 @@ public class ReportController {
     @GetMapping("/export/conflict")
     public void exportConflict(
             @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) Long deptId,
             HttpServletResponse response) throws IOException {
         String title = "项目人员冲突报表";
 
-        List<com.pmtool.dto.ConflictResult> conflicts = conflictDetectionService.detectAllConflicts();
+        List<com.pmtool.dto.ConflictResult> conflicts = conflictDetectionService.detectAllConflicts(deptId);
 
         List<String> headers = Arrays.asList("人员姓名", "工号", "项目1", "项目2", "重叠开始日期", "重叠结束日期", "重叠天数", "严重程度", "人员总冲突次数");
         List<List<String>> data = new ArrayList<>();
@@ -140,16 +153,23 @@ public class ReportController {
     @GetMapping("/export/utilization")
     public void exportUtilization(
             @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) Long deptId,
             HttpServletResponse response) throws IOException {
         String title = "人员利用率统计报表";
 
         List<Personnel> personnelList = personnelService.list();
+        // 按部门过滤人员
+        if (deptId != null) {
+            personnelList = personnelList.stream()
+                    .filter(p -> deptId.equals(p.getDeptId()))
+                    .collect(Collectors.toList());
+        }
         List<Assignment> assignments = assignmentService.list();
         Map<Long, Project> projectMap = projectService.list().stream()
                 .collect(Collectors.toMap(Project::getId, p -> p));
 
-        // 检测冲突，统计每人冲突次数
-        List<com.pmtool.dto.ConflictResult> conflictResults = conflictDetectionService.detectAllConflicts();
+        // 检测冲突，统计每人冲突次数（按部门过滤以保持一致）
+        List<com.pmtool.dto.ConflictResult> conflictResults = conflictDetectionService.detectAllConflicts(deptId);
         Map<Long, Integer> conflictCountMap = new HashMap<>();
         for (com.pmtool.dto.ConflictResult cr : conflictResults) {
             conflictCountMap.put(cr.getPersonnelId(), cr.getConflicts().size());
@@ -190,7 +210,7 @@ public class ReportController {
             data.add(Arrays.asList(
                     p.getName(),
                     p.getEmpNo(),
-                    p.getPosition() != null ? p.getPosition() : "",
+                    p.getPositions() != null ? p.getPositions() : "",
                     p.getSkills() != null ? p.getSkills() : "",
                     String.valueOf(pAssignments.size()),
                     String.valueOf(totalDays),

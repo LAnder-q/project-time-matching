@@ -25,11 +25,14 @@ public class Personnel {
     /** 姓名 */
     private String name;
 
-    /** 岗位 */
-    private String position;
+    /** 岗位（逗号分隔，支持身兼数职） */
+    private String positions;
 
     /** 技能（逗号分隔） */
     private String skills;
+
+    /** 所属部门ID */
+    private Long deptId;
 
     /** 可用开始日期 */
     private LocalDate availableStartDate;

@@ -27,8 +27,11 @@ export interface Personnel {
   id?: number
   empNo: string
   name: string
-  position: string
+  // 岗位（逗号分隔，支持身兼数职）
+  positions: string
   skills: string
+  // 所属部门ID
+  deptId?: number | null
   availableStartDate: string
   availableEndDate: string
 }
@@ -40,7 +43,6 @@ export interface Project {
   startDate: string
   endDate: string
   priority: number
-  requiredPosition: string
   dailyHours: number
 }
 

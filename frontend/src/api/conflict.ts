@@ -4,6 +4,7 @@ import type { ConflictResult, CalendarEvent } from '@/types'
 export interface CalendarQuery {
   personnelId?: number
   projectId?: number
+  deptId?: number
   startDate?: string
   endDate?: string
 }
@@ -35,8 +36,8 @@ export interface ConflictSuggestion {
   adjustAdvice?: string
 }
 
-export function detectAllConflicts(): Promise<ConflictResult[]> {
-  return http.get<ConflictResult[]>('/conflict/detect')
+export function detectAllConflicts(deptId?: number): Promise<ConflictResult[]> {
+  return http.get<ConflictResult[]>('/conflict/detect', { params: { deptId: deptId || undefined } })
 }
 
 // 后端实际接口为 GET /conflict/personnel/{personnelId}，返回单个 ConflictResult
@@ -44,9 +45,9 @@ export function detectConflictsByPersonnel(personnelId: number): Promise<Conflic
   return http.get<ConflictResult>(`/conflict/personnel/${personnelId}`)
 }
 
-// 获取全部冲突调优建议
-export function getSuggestions(): Promise<ConflictSuggestion[]> {
-  return http.get<ConflictSuggestion[]>('/conflict/suggestions')
+// 获取全部冲突调优建议（可按部门过滤）
+export function getSuggestions(deptId?: number): Promise<ConflictSuggestion[]> {
+  return http.get<ConflictSuggestion[]>('/conflict/suggestions', { params: { deptId: deptId || undefined } })
 }
 
 export function getCalendarData(params?: CalendarQuery): Promise<CalendarEvent[]> {

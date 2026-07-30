@@ -43,14 +43,17 @@ public class PersonnelServiceImpl extends ServiceImpl<PersonnelMapper, Personnel
     }
 
     @Override
-    public PageResult<Personnel> pageQuery(Integer pageNum, Integer pageSize, String name, String position) {
+    public PageResult<Personnel> pageQuery(Integer pageNum, Integer pageSize, String name, String positions, Long deptId) {
         Page<Personnel> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Personnel> wrapper = new LambdaQueryWrapper<>();
         if (name != null && !name.trim().isEmpty()) {
             wrapper.like(Personnel::getName, name);
         }
-        if (position != null && !position.trim().isEmpty()) {
-            wrapper.like(Personnel::getPosition, position);
+        if (positions != null && !positions.trim().isEmpty()) {
+            wrapper.like(Personnel::getPositions, positions);
+        }
+        if (deptId != null) {
+            wrapper.eq(Personnel::getDeptId, deptId);
         }
         wrapper.orderByDesc(Personnel::getCreateTime);
         Page<Personnel> result = this.page(page, wrapper);

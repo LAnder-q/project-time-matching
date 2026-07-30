@@ -5,13 +5,21 @@ export interface PersonnelPageQuery {
   pageNum?: number
   pageSize?: number
   keyword?: string
+  positions?: string
+  deptId?: number
 }
 
 export function getPersonnelPage(params: PersonnelPageQuery): Promise<PageResult<Personnel>> {
   // 后端接口是 GET /personnel，参数名为 name（前端 keyword 映射到 name）
-  const { pageNum, pageSize, keyword } = params
+  const { pageNum, pageSize, keyword, positions, deptId } = params
   return http.get<PageResult<Personnel>>('/personnel', {
-    params: { pageNum, pageSize, name: keyword || undefined }
+    params: {
+      pageNum,
+      pageSize,
+      name: keyword || undefined,
+      positions: positions || undefined,
+      deptId: deptId || undefined
+    }
   })
 }
 

@@ -20,6 +20,16 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
+      <el-tree-select
+        v-model="filterDeptId"
+        :data="deptTreeData"
+        :props="{ label: 'name', value: 'id', children: 'children' }"
+        check-strictly
+        clearable
+        placeholder="按部门筛选"
+        class="toolbar__dept"
+        @change="handleSearch"
+      />
       <el-button @click="handleSearch">搜索</el-button>
       <div class="toolbar__spacer"></div>
       <el-button @click="handleBatchImport">批量导入</el-button>
@@ -31,8 +41,13 @@
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="empNo" label="工号" width="120" />
         <el-table-column prop="name" label="姓名" width="120" />
-        <el-table-column prop="position" label="职位" width="140" />
+        <el-table-column prop="positions" label="岗位" min-width="160" show-overflow-tooltip />
         <el-table-column prop="skills" label="技能" min-width="180" show-overflow-tooltip />
+        <el-table-column label="部门" width="160">
+          <template #default="{ row }">
+            {{ getDeptName(row.deptId) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="availableStartDate" label="可用开始日期" width="140" />
         <el-table-column prop="availableEndDate" label="可用结束日期" width="140" />
         <el-table-column label="操作" width="160" fixed="right" align="center">
@@ -69,8 +84,22 @@
         <el-form-item label="姓名" prop="name">
           <el-input v-model="form.name" placeholder="请输入姓名" />
         </el-form-item>
-        <el-form-item label="职位" prop="position">
-          <el-input v-model="form.position" placeholder="请输入职位" />
+        <el-form-item label="部门" prop="deptId">
+          <el-tree-select
+            v-model="form.deptId"
+            :data="deptTreeData"
+            :props="{ label: 'name', value: 'id', children: 'children' }"
+            check-strictly
+            clearable
+            placeholder="请选择部门"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="岗位" prop="positions">
+          <el-input
+            v-model="form.positions"
+            placeholder="多个岗位用逗号分隔，如：运维工程师,DBA"
+          />
         </el-form-item>
         <el-form-item label="技能" prop="skills">
           <el-input
@@ -112,13 +141,13 @@
         :closable="false"
         style="margin-bottom: 16px"
       >
-        每行一个人员，字段顺序：工号, 姓名, 职位, 技能(逗号分隔), 可用开始日期, 可用结束日期。日期格式 YYYY-MM-DD。工号已存在则更新。
+        每行一个人员，字段顺序：工号, 姓名, 部门名称, 岗位(逗号分隔多岗位), 技能(逗号分隔), 可用开始日期, 可用结束日期。日期格式 YYYY-MM-DD。工号已存在则更新。部门按名称匹配，未匹配到则为空。
       </el-alert>
       <el-input
         v-model="importText"
         type="textarea"
         :rows="10"
-        placeholder="示例:&#10;EMP001,张伟,运维工程师,Linux,Docker,Kubernetes,2026-01-01,2026-12-31&#10;EMP002,李娜,运维工程师,Linux,Docker,Python,2026-01-01,2026-12-31"
+        placeholder="示例:&#10;EMP001,张伟,基础运维组,运维工程师,Linux,Docker,Kubernetes,2026-01-01,2026-12-31&#10;EMP002,李娜,运维部,运维工程师,DBA,Linux,Docker,Python,2026-01-01,2026-12-31"
       />
       <template #footer>
         <el-button @click="importDialogVisible = false">取消</el-button>
@@ -139,12 +168,17 @@ import {
   deletePersonnel,
   batchImportPersonnel
 } from '@/api/personnel'
+import { getDepartmentTree, flattenDepartments, type DepartmentVO } from '@/api/department'
 import type { Personnel } from '@/types'
 
 const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref<Personnel[]>([])
 const keyword = ref('')
+// 部门筛选
+const filterDeptId = ref<number | undefined>(undefined)
+const deptTreeData = ref<DepartmentVO[]>([])
+const deptFlatList = ref<DepartmentVO[]>([])
 const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -161,8 +195,9 @@ const importing = ref(false)
 const defaultForm = (): Personnel => ({
   empNo: '',
   name: '',
-  position: '',
+  positions: '',
   skills: '',
+  deptId: null,
   availableStartDate: '',
   availableEndDate: ''
 })
@@ -172,9 +207,26 @@ const form = reactive<Personnel>(defaultForm())
 const rules: FormRules = {
   empNo: [{ required: true, message: '请输入工号', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  position: [{ required: true, message: '请输入职位', trigger: 'blur' }],
+  positions: [{ required: true, message: '请输入岗位', trigger: 'blur' }],
   availableStartDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
   availableEndDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
+}
+
+// 加载部门树
+async function loadDepartments() {
+  try {
+    deptTreeData.value = await getDepartmentTree()
+    deptFlatList.value = flattenDepartments(deptTreeData.value)
+  } catch {
+    deptTreeData.value = []
+    deptFlatList.value = []
+  }
+}
+
+// 根据部门ID查部门名称（用于表格展示）
+function getDeptName(deptId?: number | null): string {
+  if (!deptId) return ''
+  return deptFlatList.value.find(d => d.id === deptId)?.name || ''
 }
 
 async function loadData() {
@@ -183,7 +235,8 @@ async function loadData() {
     const res = await getPersonnelPage({
       pageNum: pageNum.value,
       pageSize: pageSize.value,
-      keyword: keyword.value
+      keyword: keyword.value,
+      deptId: filterDeptId.value
     })
     tableData.value = res.list
     total.value = res.total
@@ -271,17 +324,29 @@ async function handleImportSubmit() {
   const personnelList: Partial<Personnel>[] = []
   for (const line of lines) {
     const parts = line.split(',').map((s) => s.trim())
-    if (parts.length < 6) {
-      ElMessage.error(`数据格式错误，每行至少需要6个字段: ${line}`)
+    if (parts.length < 7) {
+      ElMessage.error(`数据格式错误，每行至少需要7个字段: ${line}`)
       return
     }
+    // 字段顺序：工号, 姓名, 部门名称, 岗位(逗号分隔), 技能..., 可用开始日期, 可用结束日期
+    const empNo = parts[0]
+    const name = parts[1]
+    const deptName = parts[2]
+    const positions = parts[3]
+    // 技能：parts[4] 到 倒数第2个（含），倒数第2/第1为日期
+    const skills = parts.slice(4, -2).join(',')
+    const availableStartDate = parts[parts.length - 2]
+    const availableEndDate = parts[parts.length - 1]
+    // 部门按名称匹配（精确）
+    const dept = deptFlatList.value.find(d => d.name === deptName)
     personnelList.push({
-      empNo: parts[0],
-      name: parts[1],
-      position: parts[2],
-      skills: parts.slice(3, -2).join(','),
-      availableStartDate: parts[parts.length - 2],
-      availableEndDate: parts[parts.length - 1]
+      empNo,
+      name,
+      positions,
+      skills,
+      deptId: dept?.id ?? null,
+      availableStartDate,
+      availableEndDate
     })
   }
   importing.value = true
@@ -296,6 +361,7 @@ async function handleImportSubmit() {
 }
 
 onMounted(() => {
+  loadDepartments()
   loadData()
 })
 </script>
@@ -341,6 +407,10 @@ onMounted(() => {
 
   &__search {
     width: 280px;
+  }
+
+  &__dept {
+    width: 200px;
   }
 
   &__spacer {

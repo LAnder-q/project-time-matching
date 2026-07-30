@@ -14,6 +14,23 @@
       </div>
     </header>
 
+    <!-- 筛选工具栏 -->
+    <div class="filter-bar">
+      <el-tree-select
+        v-model="filterDeptId"
+        :data="deptTreeData"
+        :props="{ label: 'name', value: 'id', children: 'children' }"
+        check-strictly
+        clearable
+        placeholder="按部门筛选"
+        class="filter-bar__dept"
+        @change="onFilterChange"
+      />
+      <span class="filter-bar__hint">
+        共检测到 {{ conflictList.length }} 位人员存在冲突
+      </span>
+    </div>
+
     <!-- 空状态 -->
     <div v-if="!loading && conflictList.length === 0" class="empty-wrap">
       <el-empty description="暂无冲突" />
@@ -34,7 +51,12 @@
             </span>
             <div class="conflict-card__meta">
               <div class="conflict-card__name">{{ item.personnelName }}</div>
-              <div class="conflict-card__sub">工号 {{ item.empNo }}</div>
+              <div class="conflict-card__sub">
+                工号 {{ item.empNo }}
+                <span v-if="getDeptNameByPersonnelId(item.personnelId)" class="conflict-card__dept">
+                  · {{ getDeptNameByPersonnelId(item.personnelId) }}
+                </span>
+              </div>
             </div>
           </div>
           <div class="conflict-card__badges">
@@ -152,6 +174,18 @@
                         min-width="200"
                         show-overflow-tooltip
                       />
+                      <el-table-column label="操作" width="100" align="center" fixed="right">
+                        <template #default="{ row }">
+                          <el-button
+                            type="primary"
+                            size="small"
+                            :loading="isReplacing(sug.conflictAssignmentId, row.personnelId)"
+                            @click="confirmReplace(sug, row)"
+                          >
+                            替换
+                          </el-button>
+                        </template>
+                      </el-table-column>
                     </el-table>
                   </template>
 
@@ -178,16 +212,29 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Download, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { detectAllConflicts, getSuggestions } from '@/api/conflict'
+import { updateAssignment } from '@/api/assignment'
 import { exportReport } from '@/api/report'
-import type { ConflictResult } from '@/types'
-import type { ConflictSuggestion } from '@/api/conflict'
+import { getDepartmentTree, flattenDepartments, type DepartmentVO } from '@/api/department'
+import { getPersonnelAll } from '@/api/personnel'
+import { useUserStore } from '@/stores/user'
+import type { ConflictResult, Personnel } from '@/types'
+import type { ConflictSuggestion, ReplacementCandidate } from '@/api/conflict'
 
 type TagType = '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const conflictList = ref<ConflictResult[]>([])
+
+// 部门筛选
+const filterDeptId = ref<number | undefined>(undefined)
+const deptTreeData = ref<DepartmentVO[]>([])
+const deptFlatList = ref<DepartmentVO[]>([])
+// 全部人员（用于 personnelId → deptId 反查部门名）
+const personnelList = ref<Personnel[]>([])
 
 // 调优建议相关状态
 const suggestionLoading = ref(false)
@@ -195,11 +242,13 @@ const suggestionsLoaded = ref(false)
 const allSuggestions = ref<ConflictSuggestion[]>([])
 // 各人员建议面板的展开状态，key 为 personnelId
 const expanded = reactive<Record<number, boolean>>({})
+// 正在执行替换的记录集合，key 为 `${assignmentId}-${candidatePersonnelId}`
+const replacingKeys = reactive<Record<string, boolean>>({})
 
 async function loadData() {
   loading.value = true
   try {
-    conflictList.value = await detectAllConflicts()
+    conflictList.value = await detectAllConflicts(filterDeptId.value)
   } catch {
     conflictList.value = []
   } finally {
@@ -207,10 +256,41 @@ async function loadData() {
   }
 }
 
+// 加载部门树 + 全部人员（用于反查部门名）
+async function loadDepartments() {
+  try {
+    deptTreeData.value = await getDepartmentTree()
+    deptFlatList.value = flattenDepartments(deptTreeData.value)
+  } catch {
+    deptTreeData.value = []
+    deptFlatList.value = []
+  }
+  try {
+    personnelList.value = await getPersonnelAll()
+  } catch {
+    personnelList.value = []
+  }
+}
+
+// 根据人员ID反查部门名称
+function getDeptNameByPersonnelId(personnelId: number): string {
+  const p = personnelList.value.find(x => x.id === personnelId)
+  if (!p || !p.deptId) return ''
+  return deptFlatList.value.find(d => d.id === p.deptId)?.name || ''
+}
+
+// 部门筛选变化时重新加载冲突与建议（若已加载过建议）
+async function onFilterChange() {
+  await loadData()
+  if (suggestionsLoaded.value) {
+    await loadSuggestions()
+  }
+}
+
 async function loadSuggestions() {
   suggestionLoading.value = true
   try {
-    allSuggestions.value = await getSuggestions()
+    allSuggestions.value = await getSuggestions(filterDeptId.value)
   } catch {
     allSuggestions.value = []
   } finally {
@@ -220,6 +300,69 @@ async function loadSuggestions() {
 
 function isExpanded(personnelId: number): boolean {
   return !!expanded[personnelId]
+}
+
+// 替换按钮 loading 状态判断
+function isReplacing(assignmentId: number, candidateId: number): boolean {
+  return !!replacingKeys[`${assignmentId}-${candidateId}`]
+}
+
+// 当前操作人（用于后端记录操作日志）
+function currentOperator(): string {
+  const info = userStore.userInfo as { realName?: string; username?: string } | null
+  return info?.realName || info?.username || 'unknown'
+}
+
+// 二次确认替换人员：不推荐档位多一道风险提示
+async function confirmReplace(sug: ConflictSuggestion, candidate: ReplacementCandidate) {
+  const isNotRecommended =
+    (candidate.recommendationLevel || '').toUpperCase() === 'NOT_RECOMMENDED'
+
+  const message = [
+    `确认将【${sug.personnelName}】在项目【${sug.projectName}】的分配替换为【${candidate.name}（${candidate.empNo}）】？`,
+    isNotRecommended
+      ? '\n⚠️ 该候选人为「不推荐」档位，可用率或匹配度较低，替换后仍可能存在风险。'
+      : ''
+  ].join('')
+
+  try {
+    await ElMessageBox.confirm(message, '替换人员确认', {
+      type: isNotRecommended ? 'warning' : 'info',
+      confirmButtonText: '确认替换',
+      cancelButtonText: '取消',
+      confirmButtonClass: isNotRecommended ? 'el-button--warning' : 'el-button--primary'
+    })
+  } catch {
+    return
+  }
+
+  await doReplace(sug, candidate)
+}
+
+// 执行替换：仅更新 personnelId 与 operator，其余字段由后端保留原值
+async function doReplace(sug: ConflictSuggestion, candidate: ReplacementCandidate) {
+  const key = `${sug.conflictAssignmentId}-${candidate.personnelId}`
+  replacingKeys[key] = true
+  try {
+    await updateAssignment(sug.conflictAssignmentId, {
+      personnelId: candidate.personnelId,
+      operator: currentOperator()
+    })
+    ElMessage.success(`已替换为 ${candidate.name}（${candidate.empNo}）`)
+
+    // 替换成功后重新检测冲突并刷新建议面板
+    expanded[sug.personnelId] = false
+    suggestionsLoaded.value = false
+    await loadData()
+    suggestionsLoaded.value = true
+    await loadSuggestions()
+    expanded[sug.personnelId] = true
+  } catch (e) {
+    ElMessage.error('替换失败，请稍后重试')
+    console.error('[ConflictList] 替换人员失败:', e)
+  } finally {
+    replacingKeys[key] = false
+  }
 }
 
 function toggleSuggestion(personnelId: number) {
@@ -237,7 +380,7 @@ function getPersonnelSuggestions(personnelId: number): ConflictSuggestion[] {
 }
 
 function exportConflictReport() {
-  exportReport('conflict', 'xlsx')
+  exportReport('conflict', 'xlsx', { deptId: filterDeptId.value })
 }
 
 function goCalendar(personnelId: number) {
@@ -306,6 +449,7 @@ function availabilityColor(rate: number): string {
 }
 
 onMounted(() => {
+  loadDepartments()
   loadData()
 })
 </script>
@@ -358,6 +502,27 @@ onMounted(() => {
   border: 1px solid var(--pw-border);
   border-radius: var(--pw-radius-lg);
   box-shadow: var(--pw-shadow-sm);
+}
+
+/* ---- 筛选工具栏 ---- */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--pw-bg-card);
+  border: 1px solid var(--pw-border);
+  border-radius: var(--pw-radius-lg);
+  box-shadow: var(--pw-shadow-sm);
+
+  &__dept {
+    width: 240px;
+  }
+
+  &__hint {
+    font-size: 13px;
+    color: var(--pw-text-secondary);
+  }
 }
 
 /* ---- 冲突人员卡片 ---- */
@@ -426,6 +591,10 @@ onMounted(() => {
 
   &__sub {
     font-size: 12px;
+    color: var(--pw-text-secondary);
+  }
+
+  &__dept {
     color: var(--pw-text-secondary);
   }
 

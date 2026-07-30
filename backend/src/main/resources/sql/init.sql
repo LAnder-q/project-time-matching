@@ -6,26 +6,46 @@ CREATE DATABASE IF NOT EXISTS pm_tool DEFAULT CHARACTER SET utf8mb4 COLLATE utf8
 USE pm_tool;
 
 -- ============================================================
--- 人员表 personnel
+-- 部门表 department（支持层级，parent_id 自引用）
 -- ============================================================
 DROP TABLE IF EXISTS assignment;
 DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS project;
 DROP TABLE IF EXISTS personnel;
+DROP TABLE IF EXISTS department;
 DROP TABLE IF EXISTS sys_user;
 
+CREATE TABLE department (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL COMMENT '部门名称',
+  code VARCHAR(50) COMMENT '部门编码',
+  parent_id BIGINT DEFAULT NULL COMMENT '父部门ID, NULL为顶级部门',
+  sort INT DEFAULT 0 COMMENT '同级排序（升序）',
+  deleted TINYINT DEFAULT 0 COMMENT '逻辑删除',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_parent (parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表（支持层级）';
+
+-- ============================================================
+-- 人员表 personnel
+--   - position 改为 positions（逗号分隔多岗位，支持身兼数职）
+--   - 新增 dept_id 关联部门
+-- ============================================================
 CREATE TABLE personnel (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   emp_no VARCHAR(50) NOT NULL COMMENT '工号',
   name VARCHAR(100) NOT NULL COMMENT '姓名',
-  position VARCHAR(100) COMMENT '岗位',
+  positions VARCHAR(200) COMMENT '岗位（逗号分隔，支持身兼数职）',
   skills VARCHAR(500) COMMENT '技能（逗号分隔）',
+  dept_id BIGINT COMMENT '所属部门ID',
   available_start_date DATE COMMENT '可用开始日期',
   available_end_date DATE COMMENT '可用结束日期',
   deleted TINYINT DEFAULT 0 COMMENT '逻辑删除',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_emp_no (emp_no)
+  UNIQUE KEY uk_emp_no (emp_no),
+  INDEX idx_dept (dept_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='人员表';
 
 -- ============================================================
@@ -37,7 +57,6 @@ CREATE TABLE project (
   start_date DATE NOT NULL COMMENT '项目开始日期',
   end_date DATE NOT NULL COMMENT '项目结束日期',
   priority INT DEFAULT 3 COMMENT '优先级 1-5, 5最高',
-  required_position VARCHAR(100) COMMENT '所需岗位',
   daily_hours DECIMAL(5,1) DEFAULT 8.0 COMMENT '每日所需工时',
   deleted TINYINT DEFAULT 0,
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -99,21 +118,28 @@ INSERT INTO sys_user (username, password, role, real_name) VALUES
 -- 测试数据
 -- ============================================================
 
--- 人员数据（5名运维人员，技能有重叠以便测试调优建议）
-INSERT INTO personnel (emp_no, name, position, skills, available_start_date, available_end_date) VALUES
-('EMP001', '张伟', '运维工程师', 'Linux,Docker,Kubernetes,Shell', '2026-01-01', '2026-12-31'),
-('EMP002', '李娜', '运维工程师', 'Linux,Docker,Python,Ansible', '2026-01-01', '2026-12-31'),
-('EMP003', '王强', '高级运维工程师', 'Linux,Kubernetes,Python,Jenkins,CICD', '2026-01-01', '2026-12-31'),
-('EMP004', '赵敏', 'DBA', 'MySQL,Redis,Linux,Python,Shell', '2026-01-01', '2026-12-31'),
-('EMP005', '刘洋', '运维工程师', 'Linux,Docker,Kubernetes,Shell,Python', '2026-01-01', '2026-12-31');
+-- 部门数据（三级层级：技术中心 → 运维部/DBA组 → 基础运维组）
+INSERT INTO department (id, name, code, parent_id, sort) VALUES
+(1, '技术中心', 'TC', NULL, 1),
+(2, '运维部',   'OPS', 1, 1),
+(3, 'DBA组',    'DBA', 1, 2),
+(4, '基础运维组', 'OPS-BASE', 2, 1);
+
+-- 人员数据（5名运维人员，技能有重叠以便测试调优建议；支持身兼数职）
+INSERT INTO personnel (emp_no, name, positions, skills, dept_id, available_start_date, available_end_date) VALUES
+('EMP001', '张伟', '运维工程师', 'Linux,Docker,Kubernetes,Shell', 4, '2026-01-01', '2026-12-31'),
+('EMP002', '李娜', '运维工程师,DBA', 'Linux,Docker,Python,Ansible', 2, '2026-01-01', '2026-12-31'),
+('EMP003', '王强', '高级运维工程师', 'Linux,Kubernetes,Python,Jenkins,CICD', 2, '2026-01-01', '2026-12-31'),
+('EMP004', '赵敏', 'DBA,运维工程师', 'MySQL,Redis,Linux,Python,Shell', 3, '2026-01-01', '2026-12-31'),
+('EMP005', '刘洋', '运维工程师', 'Linux,Docker,Kubernetes,Shell,Python', 4, '2026-01-01', '2026-12-31');
 
 -- 项目数据（5个项目，优先级不同）
-INSERT INTO project (name, start_date, end_date, priority, required_position, daily_hours) VALUES
-('电商平台升级', '2026-02-01', '2026-06-30', 5, '运维工程师', 8.0),
-('数据中心迁移', '2026-03-01', '2026-07-31', 4, '高级运维工程师', 8.0),
-('安全审计加固', '2026-04-01', '2026-08-31', 3, '运维工程师', 6.0),
-('CI/CD流水线建设', '2026-05-01', '2026-09-30', 4, '运维工程师', 8.0),
-('数据库性能优化', '2026-03-15', '2026-07-15', 2, 'DBA', 6.0);
+INSERT INTO project (name, start_date, end_date, priority, daily_hours) VALUES
+('电商平台升级', '2026-02-01', '2026-06-30', 5, 8.0),
+('数据中心迁移', '2026-03-01', '2026-07-31', 4, 8.0),
+('安全审计加固', '2026-04-01', '2026-08-31', 3, 6.0),
+('CI/CD流水线建设', '2026-05-01', '2026-09-30', 4, 8.0),
+('数据库性能优化', '2026-03-15', '2026-07-15', 2, 6.0);
 
 -- 人员项目分配数据（包含刻意制造的冲突）
 -- 张伟(EMP001): 同时在电商平台升级和数据中心迁移，时间重叠 → 冲突

@@ -24,11 +24,11 @@ public class ConflictController {
     private ConflictDetectionService conflictDetectionService;
 
     /**
-     * 检测所有人员的分配冲突
+     * 检测所有人员的分配冲突（可按部门过滤）
      */
     @GetMapping("/detect")
-    public Result<List<ConflictResult>> detectAll() {
-        return Result.ok(conflictDetectionService.detectAllConflicts());
+    public Result<List<ConflictResult>> detectAll(@RequestParam(required = false) Long deptId) {
+        return Result.ok(conflictDetectionService.detectAllConflicts(deptId));
     }
 
     /**
@@ -40,22 +40,23 @@ public class ConflictController {
     }
 
     /**
-     * 获取日历视图数据（支持按人员、项目、时间区间筛选）
+     * 获取日历视图数据（支持按人员、项目、部门、时间区间筛选）
      */
     @GetMapping("/calendar")
     public Result<List<CalendarEvent>> calendar(
             @RequestParam(required = false) Long personnelId,
             @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return Result.ok(conflictDetectionService.getCalendarData(personnelId, projectId, startDate, endDate));
+        return Result.ok(conflictDetectionService.getCalendarData(personnelId, projectId, deptId, startDate, endDate));
     }
 
     /**
-     * 生成冲突调优建议
+     * 生成冲突调优建议（可按部门过滤）
      */
     @GetMapping("/suggestions")
-    public Result<List<ConflictSuggestion>> suggestions() {
-        return Result.ok(conflictDetectionService.generateSuggestions());
+    public Result<List<ConflictSuggestion>> suggestions(@RequestParam(required = false) Long deptId) {
+        return Result.ok(conflictDetectionService.generateSuggestions(deptId));
     }
 }

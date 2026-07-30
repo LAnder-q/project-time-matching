@@ -28,8 +28,9 @@ public class PersonnelController {
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String name,
-            @RequestParam(required = false) String position) {
-        return Result.ok(personnelService.pageQuery(pageNum, pageSize, name, position));
+            @RequestParam(required = false) String positions,
+            @RequestParam(required = false) Long deptId) {
+        return Result.ok(personnelService.pageQuery(pageNum, pageSize, name, positions, deptId));
     }
 
     /**

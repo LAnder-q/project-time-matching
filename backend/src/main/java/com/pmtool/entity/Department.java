@@ -6,34 +6,29 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 项目实体
+ * 部门实体（支持层级，parent_id 自引用）
  */
 @Data
-@TableName("project")
-public class Project {
+@TableName("department")
+public class Department {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 项目名称 */
+    /** 部门名称 */
     private String name;
 
-    /** 项目开始日期 */
-    private LocalDate startDate;
+    /** 部门编码 */
+    private String code;
 
-    /** 项目结束日期 */
-    private LocalDate endDate;
+    /** 父部门ID, NULL为顶级部门 */
+    private Long parentId;
 
-    /** 优先级 1-5, 5最高 */
-    private Integer priority;
-
-    /** 每日所需工时 */
-    private BigDecimal dailyHours;
+    /** 同级排序（升序） */
+    private Integer sort;
 
     /** 逻辑删除标志 */
     @TableLogic
