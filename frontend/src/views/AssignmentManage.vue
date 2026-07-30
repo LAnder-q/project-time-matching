@@ -32,7 +32,7 @@
           filterable
           :filter-method="filterPersonnel"
           style="width: 200px"
-          @change="loadData"
+          @change="handleSearch"
           @visible-change="onPersonnelSelectClose"
         >
           <el-option
@@ -47,13 +47,13 @@
           placeholder="按项目筛选"
           clearable
           style="width: 200px"
-          @change="loadData"
+          @change="handleSearch"
         >
           <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id!" />
         </el-select>
       </div>
       <div class="filter-bar__meta">
-        共 <strong>{{ tableData.length }}</strong> 条分配记录
+        共 <strong>{{ total }}</strong> 条分配记录
       </div>
     </section>
 
@@ -80,6 +80,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="table-panel__footer">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="loadData"
+          @current-change="loadData"
+        />
+      </div>
     </section>
 
     <el-dialog
@@ -162,7 +173,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
-  getAssignmentList,
+  getAssignmentPage,
   createAssignment,
   updateAssignment,
   deleteAssignment
@@ -175,6 +186,9 @@ import type { Assignment, Personnel, Project } from '@/types'
 const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref<Assignment[]>([])
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = ref(10)
 const personnelOptions = ref<Personnel[]>([])
 const projectOptions = ref<Project[]>([])
 const deptTreeData = ref<DepartmentVO[]>([])
@@ -208,7 +222,7 @@ function onFilterDeptChange() {
   ) {
     filterPersonnelId.value = undefined
   }
-  loadData()
+  handleSearch()
 }
 
 // 表单内部门变化时：清空已选人员（避免部门与人员不一致）
@@ -273,16 +287,26 @@ const rules: FormRules = {
 async function loadData() {
   loading.value = true
   try {
-    const res = await getAssignmentList({
+    const res = await getAssignmentPage({
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
       personnelId: filterPersonnelId.value,
       projectId: filterProjectId.value
     })
-    tableData.value = res
+    tableData.value = res.list
+    total.value = res.total
   } catch {
     tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
+}
+
+/** 筛选条件变化时重置到第一页 */
+function handleSearch() {
+  pageNum.value = 1
+  loadData()
 }
 
 async function loadOptions() {
@@ -463,5 +487,12 @@ onMounted(() => {
   border-radius: var(--pw-radius-lg);
   box-shadow: var(--pw-shadow-sm);
   padding: 14px 16px;
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 14px;
+  }
 }
 </style>

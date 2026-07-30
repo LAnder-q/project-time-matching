@@ -2,7 +2,9 @@ package com.pmtool.service.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.pmtool.common.PageResult;
 import com.pmtool.dto.AssignmentDTO;
 import com.pmtool.dto.AssignmentVO;
 import com.pmtool.entity.Assignment;
@@ -18,6 +20,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,7 +46,25 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
     }
 
     @Override
+    public PageResult<AssignmentVO> pageByConditions(Integer pageNum, Integer pageSize, Long personnelId, Long projectId) {
+        Page<Assignment> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Assignment> wrapper = buildQueryWrapper(personnelId, projectId);
+        Page<Assignment> result = this.page(page, wrapper);
+        List<AssignmentVO> voList = fillVoFields(result.getRecords());
+        return PageResult.of(voList, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
     public List<AssignmentVO> listByConditions(Long personnelId, Long projectId) {
+        LambdaQueryWrapper<Assignment> wrapper = buildQueryWrapper(personnelId, projectId);
+        List<Assignment> assignments = this.list(wrapper);
+        return fillVoFields(assignments);
+    }
+
+    /**
+     * 构建查询条件（分页与全量共用）
+     */
+    private LambdaQueryWrapper<Assignment> buildQueryWrapper(Long personnelId, Long projectId) {
         LambdaQueryWrapper<Assignment> wrapper = new LambdaQueryWrapper<>();
         if (personnelId != null) {
             wrapper.eq(Assignment::getPersonnelId, personnelId);
@@ -52,8 +73,16 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
             wrapper.eq(Assignment::getProjectId, projectId);
         }
         wrapper.orderByDesc(Assignment::getStartDate);
-        List<Assignment> assignments = this.list(wrapper);
+        return wrapper;
+    }
 
+    /**
+     * 填充联表字段（人员姓名、工号、项目名称），供分页与全量共用
+     */
+    private List<AssignmentVO> fillVoFields(List<Assignment> assignments) {
+        if (assignments.isEmpty()) {
+            return new ArrayList<>();
+        }
         // 批量查询关联的人员和项目信息
         Set<Long> personnelIds = assignments.stream().map(Assignment::getPersonnelId).collect(Collectors.toSet());
         Set<Long> projectIds = assignments.stream().map(Assignment::getProjectId).collect(Collectors.toSet());

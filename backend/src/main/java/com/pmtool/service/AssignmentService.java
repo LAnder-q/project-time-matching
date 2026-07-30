@@ -1,6 +1,7 @@
 package com.pmtool.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.pmtool.common.PageResult;
 import com.pmtool.dto.AssignmentDTO;
 import com.pmtool.dto.AssignmentVO;
 import com.pmtool.entity.Assignment;
@@ -13,7 +14,18 @@ import java.util.List;
 public interface AssignmentService extends IService<Assignment> {
 
     /**
-     * 按条件查询分配记录（含人员姓名、工号、项目名称等联表字段）
+     * 按条件分页查询分配记录（含人员姓名、工号、项目名称等联表字段）
+     *
+     * @param pageNum    页码
+     * @param pageSize   每页条数
+     * @param personnelId 人员ID（可选）
+     * @param projectId   项目ID（可选）
+     * @return 分页结果（VO）
+     */
+    PageResult<AssignmentVO> pageByConditions(Integer pageNum, Integer pageSize, Long personnelId, Long projectId);
+
+    /**
+     * 按条件查询全部分配记录（含人员姓名、工号、项目名称等联表字段）
      *
      * @param personnelId 人员ID（可选）
      * @param projectId   项目ID（可选）

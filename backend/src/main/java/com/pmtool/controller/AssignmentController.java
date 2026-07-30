@@ -1,5 +1,6 @@
 package com.pmtool.controller;
 
+import com.pmtool.common.PageResult;
 import com.pmtool.common.Result;
 import com.pmtool.dto.AssignmentDTO;
 import com.pmtool.dto.AssignmentVO;
@@ -22,7 +23,20 @@ public class AssignmentController {
     private AssignmentService assignmentService;
 
     /**
-     * 查询分配记录（支持按人员ID、项目ID筛选，含人员姓名、项目名称等联表字段）
+     * 分页查询分配记录（支持按人员ID、项目ID筛选，含人员姓名、项目名称等联表字段）
+     */
+    @GetMapping("/page")
+    public Result<PageResult<AssignmentVO>> page(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) Long personnelId,
+            @RequestParam(required = false) Long projectId) {
+        return Result.ok(assignmentService.pageByConditions(pageNum, pageSize, personnelId, projectId));
+    }
+
+    /**
+     * 查询全部分配记录（支持按人员ID、项目ID筛选，含人员姓名、项目名称等联表字段）
+     * 用于日历、报表等不需要分页的场景
      */
     @GetMapping
     public Result<List<AssignmentVO>> list(

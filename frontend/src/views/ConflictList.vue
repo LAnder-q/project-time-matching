@@ -39,7 +39,7 @@
     <!-- 冲突人员列表 -->
     <div v-loading="loading" class="conflict-list">
       <article
-        v-for="item in conflictList"
+        v-for="item in pagedConflictList"
         :key="item.personnelId"
         class="conflict-card"
       >
@@ -204,12 +204,24 @@
           </el-collapse-transition>
         </div>
       </article>
+
+      <!-- 前端分页 -->
+      <div v-if="conflictList.length > 0" class="conflict-list__pager">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :total="conflictList.length"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Download, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -228,6 +240,14 @@ const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
 const conflictList = ref<ConflictResult[]>([])
+
+// 前端分页（冲突为内存计算结果，后端不分页）
+const pageNum = ref(1)
+const pageSize = ref(10)
+const pagedConflictList = computed(() => {
+  const start = (pageNum.value - 1) * pageSize.value
+  return conflictList.value.slice(start, start + pageSize.value)
+})
 
 // 部门筛选
 const filterDeptId = ref<number | undefined>(undefined)
@@ -254,6 +274,8 @@ async function loadData() {
   } finally {
     loading.value = false
   }
+  // 数据刷新后回到第一页
+  pageNum.value = 1
 }
 
 // 加载部门树 + 全部人员（用于反查部门名）
@@ -530,6 +552,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  &__pager {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 0;
+  }
 }
 
 .conflict-card {
