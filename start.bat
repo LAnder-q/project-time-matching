@@ -1,13 +1,12 @@
-@echo off
-chcp 936 >nul
+ï»¿@echo off
 setlocal
 
 REM ============================================================
-REM  ÈËÔ±-ÏîÄ¿Ê±¼äÆ¥Åä¹ÜÀíÏµÍ³ - Ò»¼üÆô¶¯½Å±¾
-REM  ÓÃ·¨£º
-REM    1. Ë«»÷ÔËĞĞ±¾½Å±¾£¨ÍÆ¼ö£©
-REM    2. ÃüÁîĞĞ: start.bat [--check]  £¨--check ½ö¼ì²é»·¾³²»Æô¶¯·şÎñ£©
-REM  ¹¦ÄÜ£º×Ô¶¯¼ì²é MySQL¡¢³õÊ¼»¯Êı¾İ¿â£¨ÈçĞè£©¡¢Æô¶¯Ç°ºó¶Ë¡¢´ò¿ªä¯ÀÀÆ÷
+REM  äººå‘˜-é¡¹ç›®æ—¶é—´åŒ¹é…ç®¡ç†ç³»ç»Ÿ - ä¸€é”®å¯åŠ¨è„šæœ¬
+REM  ç”¨æ³•ï¼š
+REM    1. åŒå‡»è¿è¡Œæœ¬è„šæœ¬ï¼ˆæ¨èï¼‰
+REM    2. å‘½ä»¤è¡Œ: start.bat [--check]  ï¼ˆ--check ä»…æ£€æŸ¥ç¯å¢ƒä¸å¯åŠ¨æœåŠ¡ï¼‰
+REM  åŠŸèƒ½ï¼šè‡ªåŠ¨æ£€æŸ¥ MySQLã€åˆå§‹åŒ–æ•°æ®åº“ï¼ˆå¦‚éœ€ï¼‰ã€å¯åŠ¨å‰åç«¯ã€æ‰“å¼€æµè§ˆå™¨
 REM ============================================================
 
 set "ROOT=%~dp0"
@@ -15,7 +14,7 @@ set "DB_NAME=pm_tool"
 set "MYSQL_USER=root"
 set "MYSQL_PASS=123456"
 
-REM ---- »·¾³Â·¾¶£¨°´±¾»úÊµ¼Ê°²×°Î»ÖÃ×Ô¶¯Ì½²â£© ----
+REM ---- ç¯å¢ƒè·¯å¾„ï¼ˆæŒ‰æœ¬æœºå®é™…å®‰è£…ä½ç½®è‡ªåŠ¨æ¢æµ‹ï¼‰ ----
 set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
 if not exist "%JAVA_HOME%\bin\java.exe" (
     for /d %%d in ("C:\Program Files\Eclipse Adoptium\jdk-17*" "C:\Program Files\Java\jdk-17*") do (
@@ -31,16 +30,16 @@ set "PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%MYSQL_BIN%;%PATH%"
 
 echo.
 echo  ============================================
-echo   ÈËÔ±-ÏîÄ¿Ê±¼äÆ¥Åä¹ÜÀíÏµÍ³ - Ò»¼üÆô¶¯
+echo   äººå‘˜-é¡¹ç›®æ—¶é—´åŒ¹é…ç®¡ç†ç³»ç»Ÿ - ä¸€é”®å¯åŠ¨
 echo  ============================================
 echo.
 
-REM ========== 1. »·¾³¼ì²é ==========
-echo  [1/5] ¼ì²é»·¾³ÒÀÀµ...
+REM ========== 1. ç¯å¢ƒæ£€æŸ¥ ==========
+echo  [1/5] æ£€æŸ¥ç¯å¢ƒä¾èµ–...
 
 java -version >nul 2>&1
 if errorlevel 1 (
-    echo   [´íÎó] Î´ÕÒµ½ JDK 17£¬ÇëÏÈ°²×°
+    echo   [é”™è¯¯] æœªæ‰¾åˆ° JDK 17ï¼Œè¯·å…ˆå®‰è£…
     set "FAILED=1"
 ) else (
     echo   [OK] Java: %JAVA_HOME%
@@ -48,7 +47,7 @@ if errorlevel 1 (
 
 call "%MAVEN_HOME%\bin\mvn.cmd" -v >nul 2>&1
 if errorlevel 1 (
-    echo   [´íÎó] Î´ÕÒµ½ Maven
+    echo   [é”™è¯¯] æœªæ‰¾åˆ° Maven
     set "FAILED=1"
 ) else (
     echo   [OK] Maven 3.9.16
@@ -56,91 +55,91 @@ if errorlevel 1 (
 
 node -v >nul 2>&1
 if errorlevel 1 (
-    echo   [´íÎó] Î´ÕÒµ½ Node.js
+    echo   [é”™è¯¯] æœªæ‰¾åˆ° Node.js
     set "FAILED=1"
 ) else (
-    echo   [OK] Node.js ÒÑ°²×°
+    echo   [OK] Node.js å·²å®‰è£…
 )
 
 if not "%FAILED%"=="" (
     echo.
-    echo  [´íÎó] »·¾³ÒÀÀµÈ±Ê§£¬Çë°²×°ºóÔÙÊÔ¡£
+    echo  [é”™è¯¯] ç¯å¢ƒä¾èµ–ç¼ºå¤±ï¼Œè¯·å®‰è£…åå†è¯•ã€‚
     pause
     exit /b 1
 )
 
-REM ========== 2. ¼ì²é MySQL ==========
-echo  [2/5] ¼ì²é MySQL ·şÎñ...
+REM ========== 2. æ£€æŸ¥ MySQL ==========
+echo  [2/5] æ£€æŸ¥ MySQL æœåŠ¡...
 if "%MYSQL_BIN%"=="" (
-    echo   [´íÎó] Î´ÕÒµ½ mysql ¿Í»§¶Ë£¬ÇëÈ·ÈÏ MySQL ÒÑ°²×°¡£
+    echo   [é”™è¯¯] æœªæ‰¾åˆ° mysql å®¢æˆ·ç«¯ï¼Œè¯·ç¡®è®¤ MySQL å·²å®‰è£…ã€‚
     pause
     exit /b 1
 )
 "%MYSQL_BIN%\mysql.exe" -u%MYSQL_USER% -p%MYSQL_PASS% -e "SELECT 1;" >nul 2>&1
 if errorlevel 1 (
-    echo   [´íÎó] ÎŞ·¨Á¬½Ó MySQL£¨Çë¼ì²é·şÎñÊÇ·ñÆô¶¯¡¢application.yml ÖĞÕËºÅÃÜÂëÊÇ·ñÕıÈ·£©¡£
+    echo   [é”™è¯¯] æ— æ³•è¿æ¥ MySQLï¼ˆè¯·æ£€æŸ¥æœåŠ¡æ˜¯å¦å¯åŠ¨ã€application.yml ä¸­è´¦å·å¯†ç æ˜¯å¦æ­£ç¡®ï¼‰ã€‚
     pause
     exit /b 1
 )
-echo   [OK] MySQL ÒÑÔËĞĞ
+echo   [OK] MySQL å·²è¿è¡Œ
 
-REM ========== 3. ¼ì²éÊı¾İ¿â²¢×Ô¶¯³õÊ¼»¯ ==========
-echo  [3/5] ¼ì²éÊı¾İ¿â %DB_NAME% ...
+REM ========== 3. æ£€æŸ¥æ•°æ®åº“å¹¶è‡ªåŠ¨åˆå§‹åŒ– ==========
+echo  [3/5] æ£€æŸ¥æ•°æ®åº“ %DB_NAME% ...
 "%MYSQL_BIN%\mysql.exe" -u%MYSQL_USER% -p%MYSQL_PASS% -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%DB_NAME%';" >nul 2>&1
 if errorlevel 1 (
-    echo   [ÌáÊ¾] Êı¾İ¿â %DB_NAME% ²»´æÔÚ£¬×Ô¶¯³õÊ¼»¯...
+    echo   [æç¤º] æ•°æ®åº“ %DB_NAME% ä¸å­˜åœ¨ï¼Œè‡ªåŠ¨åˆå§‹åŒ–...
     "%MYSQL_BIN%\mysql.exe" -u%MYSQL_USER% -p%MYSQL_PASS% -e "CREATE DATABASE IF NOT EXISTS %DB_NAME% DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
     if errorlevel 1 (
-        echo   [¾¯¸æ] ×Ô¶¯½¨¿âÊ§°Ü£¬ÇëÊÖ¶¯Ö´ĞĞ backend\src\main\resources\sql\init.sql ºóÖØÊÔ¡£
+        echo   [è­¦å‘Š] è‡ªåŠ¨å»ºåº“å¤±è´¥ï¼Œè¯·æ‰‹åŠ¨æ‰§è¡Œ backend\src\main\resources\sql\init.sql åé‡è¯•ã€‚
         pause
         exit /b 1
     )
     "%MYSQL_BIN%\mysql.exe" -u%MYSQL_USER% -p%MYSQL_PASS% --default-character-set=utf8mb4 %DB_NAME% < "%ROOT%backend\src\main\resources\sql\init.sql"
     if errorlevel 1 (
-        echo   [¾¯¸æ] µ¼Èë init.sql Ê§°Ü£¬ÇëÊÖ¶¯¼ì²é¡£
+        echo   [è­¦å‘Š] å¯¼å…¥ init.sql å¤±è´¥ï¼Œè¯·æ‰‹åŠ¨æ£€æŸ¥ã€‚
         pause
         exit /b 1
     )
-    echo   [OK] Êı¾İ¿â³õÊ¼»¯Íê³É
+    echo   [OK] æ•°æ®åº“åˆå§‹åŒ–å®Œæˆ
 ) else (
-    echo   [OK] Êı¾İ¿âÒÑ´æÔÚ
+    echo   [OK] æ•°æ®åº“å·²å­˜åœ¨
 )
 
 if "%1"=="--check" (
     echo.
     echo  ============================================
-    echo   »·¾³¼ì²éÍê±Ï£¬È«²¿¾ÍĞ÷£¬¿ÉÒÔÆô¶¯·şÎñ¡£
+    echo   ç¯å¢ƒæ£€æŸ¥å®Œæ¯•ï¼Œå…¨éƒ¨å°±ç»ªï¼Œå¯ä»¥å¯åŠ¨æœåŠ¡ã€‚
     echo  ============================================
     echo.
     pause
     exit /b 0
 )
 
-REM ========== 4. Æô¶¯ºó¶Ë ==========
-echo  [4/5] Æô¶¯ºó¶Ë·şÎñ (http://localhost:8080/api) ...
+REM ========== 4. å¯åŠ¨åç«¯ ==========
+echo  [4/5] å¯åŠ¨åç«¯æœåŠ¡ (http://localhost:8080/api) ...
 pushd "%ROOT%backend"
 start "PMTool-Backend" cmd /k "mvn spring-boot:run"
 popd
 
-REM ========== 5. Æô¶¯Ç°¶Ë ==========
-echo  [5/5] Æô¶¯Ç°¶Ë·şÎñ (http://localhost:5173) ...
+REM ========== 5. å¯åŠ¨å‰ç«¯ ==========
+echo  [5/5] å¯åŠ¨å‰ç«¯æœåŠ¡ (http://localhost:5173) ...
 pushd "%ROOT%frontend"
 start "PMTool-Frontend" cmd /k "npm run dev"
 popd
 
-REM ========== ´ò¿ªä¯ÀÀÆ÷ ==========
+REM ========== æ‰“å¼€æµè§ˆå™¨ ==========
 echo.
-echo  ÕıÔÚÆô¶¯ä¯ÀÀÆ÷£¬ÇëÉÔºò£¨ºó¶ËÊ×´ÎÆô¶¯Ğè±àÒë£¬Ô¼ 30-60 Ãë£©...
+echo  æ­£åœ¨å¯åŠ¨æµè§ˆå™¨ï¼Œè¯·ç¨å€™ï¼ˆåç«¯é¦–æ¬¡å¯åŠ¨éœ€ç¼–è¯‘ï¼Œçº¦ 30-60 ç§’ï¼‰...
 timeout /t 8 /nobreak >nul
 start http://localhost:5173
 
 echo.
 echo  ============================================
-echo   Æô¶¯Íê³É£¡
-echo   Ç°¶ËµØÖ·: http://localhost:5173
-echo   ºó¶ËµØÖ·: http://localhost:8080/api
-echo   ²âÊÔÕËºÅ: admin / 123456
-echo   (¹Ø±ÕÁ½¸ö·şÎñ´°¿Ú¼´¿ÉÍ£Ö¹ÏµÍ³)
+echo   å¯åŠ¨å®Œæˆï¼
+echo   å‰ç«¯åœ°å€: http://localhost:5173
+echo   åç«¯åœ°å€: http://localhost:8080/api
+echo   æµ‹è¯•è´¦å·: admin / 123456
+echo   (å…³é—­ä¸¤ä¸ªæœåŠ¡çª—å£å³å¯åœæ­¢ç³»ç»Ÿ)
 echo  ============================================
 echo.
 pause
