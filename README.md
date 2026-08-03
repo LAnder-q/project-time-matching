@@ -90,6 +90,7 @@
 
 ```
 project-time-matching/
+├── start.bat                         # 一键启动脚本（双击运行）
 ├── backend/                          # Spring Boot 后端
 │   ├── pom.xml                       # Maven 依赖配置
 │   └── src/main/
@@ -165,11 +166,31 @@ project-time-matching/
 │       │   ├── CalendarView.vue      #   日历视图
 │       │   └── NotFound.vue          #   404 页面
 │       └── assets/styles/main.scss   # 全局样式(Indigo 设计系统)
-├── tech-docs.html                    # 技术文档(浏览器打开可查看)
+├── tech-doc/                         # 技术文档目录
+│   └── tech-doc.html                 #   完整技术文档(浏览器打开可查看)
 └── README.md
 ```
 
 ## 快速开始
+
+### 一键启动（推荐）
+
+项目根目录提供 `start.bat` 一键启动脚本，**双击即可**完成全部启动流程，无需手动安装依赖或配置环境：
+
+```
+① 自动检测 JDK / Maven / Node.js
+② 自动检测 MySQL 服务是否运行
+③ 自动检查 pm_tool 数据库，不存在则自动建库并导入 init.sql
+④ 启动后端服务 (http://localhost:8080/api)
+⑤ 启动前端服务 (http://localhost:5173)
+⑥ 自动打开浏览器
+```
+
+> 提示：
+> - 脚本会自动探测本机 Java 17、Maven、MySQL 客户端路径，无需提前配置环境变量
+> - 如只想检查环境是否就绪而不启动服务，可在命令行运行 `start.bat --check`
+> - 默认数据库账号密码为 `root / 123456`，如需修改请同时更新 `backend/src/main/resources/application.yml` 和 `start.bat` 开头的 `MYSQL_USER / MYSQL_PASS`
+> - 关闭「PMTool-Backend」「PMTool-Frontend」两个窗口即可停止系统
 
 ### 环境要求
 
@@ -385,7 +406,7 @@ personnel (1) ──< assignment >── (1) project
 | GET | `/report/export/conflict` | 项目人员冲突报表（参数：format=xlsx/pdf） |
 | GET | `/report/export/utilization` | 人员利用率统计（参数：format=xlsx/pdf） |
 
-> 完整的接口请求/响应示例和字段说明请参阅 [技术文档](tech-docs.html)。
+> 完整的接口请求/响应示例和字段说明请参阅 [技术文档](tech-doc/tech-doc.html)。
 
 ## 配置说明
 
@@ -553,7 +574,7 @@ mvn clean package        # 打包
 
 ## 相关文档
 
-- [技术文档](tech-docs.html) — 包含完整的系统架构、文件说明、数据库设计、核心算法和 API 接口详情（浏览器打开即可浏览）
+- [技术文档](tech-doc/tech-doc.html) — 包含完整的系统架构、文件说明、数据库设计、核心算法和 API 接口详情（浏览器打开即可浏览）
 
 ## License
 
