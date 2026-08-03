@@ -17,4 +17,12 @@ public interface DepartmentService extends IService<Department> {
      * @return 顶级部门列表，每个节点含 children
      */
     List<DepartmentVO> getDepartmentTree();
+
+    /**
+     * 根据部门名称查找部门ID（用于 Excel 导入时按名称匹配部门）
+     *
+     * @param name 部门名称
+     * @return 部门ID，未找到返回 null
+     */
+    Long findIdByName(String name);
 }

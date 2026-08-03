@@ -64,4 +64,16 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
         result.sort(Comparator.comparingInt(v -> v.getSort() == null ? 0 : v.getSort()));
         return result;
     }
+
+    @Override
+    public Long findIdByName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        LambdaQueryWrapper<Department> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Department::getName, name.trim());
+        wrapper.last("LIMIT 1");
+        Department dept = this.getOne(wrapper, false);
+        return dept != null ? dept.getId() : null;
+    }
 }

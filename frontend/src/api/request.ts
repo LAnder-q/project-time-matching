@@ -49,6 +49,12 @@ service.interceptors.response.use(
       }
       return Promise.reject(error)
     }
+    // 403 无权限：提示权限不足
+    if (error.response?.status === 403) {
+      const msg = error.response?.data?.message || '权限不足，无法执行此操作'
+      ElMessage.error(msg)
+      return Promise.reject(error)
+    }
     ElMessage.error(error.response?.data?.message || error.message || '网络异常')
     return Promise.reject(error)
   }

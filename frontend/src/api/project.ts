@@ -38,3 +38,22 @@ export function deleteProject(id: number): Promise<void> {
 export function batchImportProjects(data: Partial<Project>[]): Promise<Project[]> {
   return http.post<Project[]>('/project/batch', data)
 }
+
+/**
+ * Excel 文件上传导入项目
+ */
+export function importProjectExcel(file: File): Promise<number> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.post<number>('/project/import-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/**
+ * 下载项目导入模板
+ */
+export function downloadProjectTemplate(): void {
+  const token = localStorage.getItem('token') || ''
+  window.open(`/api/project/import-template?token=${encodeURIComponent(token)}`)
+}

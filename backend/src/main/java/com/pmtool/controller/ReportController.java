@@ -1,6 +1,7 @@
 package com.pmtool.controller;
 
 import com.alibaba.excel.EasyExcel;
+import com.pmtool.annotation.RequireRole;
 import com.pmtool.entity.*;
 import com.pmtool.mapper.OperationLogMapper;
 import com.pmtool.service.*;
@@ -17,8 +18,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 报表导出 Controller
+ * 注意：路径前缀 /api 由 context-path 提供，Controller 内不加 /api
+ * 报表导出需管理员或项目负责人权限
+ */
 @RestController
 @RequestMapping("/report")
+@RequireRole({"ADMIN", "PROJECT_LEAD"})
 public class ReportController {
 
     @Autowired

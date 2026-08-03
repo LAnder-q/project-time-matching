@@ -103,33 +103,69 @@
     </el-dialog>
 
     <el-dialog v-model="importDialogVisible" title="批量导入项目" width="680px">
-      <el-alert
-        title="数据格式说明"
-        type="info"
-        :closable="false"
-        style="margin-bottom: 16px"
-      >
-        每行一个项目，字段顺序：项目名称, 开始日期, 结束日期, 优先级, 每日工时。日期格式 YYYY-MM-DD。项目名已存在则更新。
-      </el-alert>
-      <el-input
-        v-model="importText"
-        type="textarea"
-        :rows="10"
-        placeholder="示例:&#10;项目A,2024-01-01,2024-06-30,5,8&#10;项目B,2024-03-01,2024-09-30,3,6"
-      />
-      <template #footer>
-        <el-button @click="importDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="importing" @click="handleImportSubmit">导入</el-button>
-      </template>
+      <el-tabs v-model="importTab">
+        <el-tab-pane label="Excel 文件导入" name="excel">
+          <el-alert
+            title="操作说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            请先下载模板，按模板格式填写数据后上传。项目名已存在则更新，不存在则新增。
+          </el-alert>
+          <div style="margin-bottom: 16px">
+            <el-button @click="handleDownloadTemplate">下载导入模板</el-button>
+          </div>
+          <el-upload
+            ref="uploadRef"
+            :auto-upload="false"
+            :limit="1"
+            accept=".xlsx,.xls"
+            :on-change="handleFileChange"
+            :on-exceed="handleExceed"
+            drag
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">将 Excel 文件拖到此处，或<em>点击上传</em></div>
+            <template #tip>
+              <div class="el-upload__tip">仅支持 .xlsx / .xls 格式，文件大小不超过 10MB</div>
+            </template>
+          </el-upload>
+          <template #footer>
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="importing" @click="handleExcelImport">导入</el-button>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane label="文本批量导入" name="text">
+          <el-alert
+            title="数据格式说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            每行一个项目，字段顺序：项目名称, 开始日期, 结束日期, 优先级, 每日工时。日期格式 YYYY-MM-DD。项目名已存在则更新。
+          </el-alert>
+          <el-input
+            v-model="importText"
+            type="textarea"
+            :rows="10"
+            placeholder="示例:&#10;项目A,2024-01-01,2024-06-30,5,8&#10;项目B,2024-03-01,2024-09-30,3,6"
+          />
+          <template #footer>
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="importing" @click="handleImportSubmit">导入</el-button>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
-import { getProjectPage, createProject, updateProject, deleteProject, batchImportProjects } from '@/api/project'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadInstance, type UploadFile, type UploadFiles } from 'element-plus'
+import { Search, UploadFilled } from '@element-plus/icons-vue'
+import { getProjectPage, createProject, updateProject, deleteProject, batchImportProjects, importProjectExcel, downloadProjectTemplate } from '@/api/project'
 import type { Project } from '@/types'
 
 const loading = ref(false)
@@ -148,6 +184,9 @@ const formRef = ref<FormInstance>()
 const importDialogVisible = ref(false)
 const importText = ref('')
 const importing = ref(false)
+const importTab = ref('excel')
+const uploadRef = ref<UploadInstance>()
+const selectedFile = ref<File | null>(null)
 
 const defaultForm = (): Project => ({
   name: '',
@@ -249,7 +288,45 @@ async function handleSubmit() {
 // 批量导入
 function handleBatchImport() {
   importText.value = ''
+  selectedFile.value = null
+  importTab.value = 'excel'
   importDialogVisible.value = true
+}
+
+// 下载导入模板
+function handleDownloadTemplate() {
+  downloadProjectTemplate()
+}
+
+// 文件选择变化
+function handleFileChange(file: UploadFile, _files: UploadFiles) {
+  selectedFile.value = file.raw || null
+}
+
+// 超出文件数量限制
+function handleExceed(_files: UploadFile[]) {
+  ElMessage.warning('只能上传一个文件，请先移除已选文件')
+}
+
+// Excel 文件导入
+async function handleExcelImport() {
+  if (!selectedFile.value) {
+    ElMessage.warning('请先选择要上传的 Excel 文件')
+    return
+  }
+  importing.value = true
+  try {
+    const count = await importProjectExcel(selectedFile.value)
+    ElMessage.success(`成功导入 ${count} 条项目数据`)
+    importDialogVisible.value = false
+    uploadRef.value?.clearFiles()
+    selectedFile.value = null
+    loadData()
+  } catch {
+    // 错误已在拦截器统一提示
+  } finally {
+    importing.value = false
+  }
 }
 
 async function handleImportSubmit() {

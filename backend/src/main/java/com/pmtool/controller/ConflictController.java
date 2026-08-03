@@ -1,5 +1,6 @@
 package com.pmtool.controller;
 
+import com.pmtool.annotation.RequireRole;
 import com.pmtool.common.Result;
 import com.pmtool.dto.CalendarEvent;
 import com.pmtool.dto.ConflictResult;
@@ -15,9 +16,11 @@ import java.util.List;
 /**
  * 冲突检测 Controller
  * 注意：路径前缀 /api 由 context-path 提供，Controller 内不加 /api
+ * 所有角色均可访问冲突检测和日历视图
  */
 @RestController
 @RequestMapping("/conflict")
+@RequireRole({"ADMIN", "PROJECT_LEAD", "USER"})
 public class ConflictController {
 
     @Autowired

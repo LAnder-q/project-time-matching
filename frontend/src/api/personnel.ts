@@ -46,3 +46,22 @@ export function deletePersonnel(id: number): Promise<void> {
 export function batchImportPersonnel(data: Partial<Personnel>[]): Promise<number> {
   return http.post<number>('/personnel/batch', data)
 }
+
+/**
+ * Excel 文件上传导入人员
+ */
+export function importPersonnelExcel(file: File): Promise<number> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.post<number>('/personnel/import-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/**
+ * 下载人员导入模板
+ */
+export function downloadPersonnelTemplate(): void {
+  const token = localStorage.getItem('token') || ''
+  window.open(`/api/personnel/import-template?token=${encodeURIComponent(token)}`)
+}
