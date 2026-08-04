@@ -40,6 +40,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '分配管理', roles: ['ADMIN', 'PROJECT_LEAD'] }
       },
       {
+        path: 'operation-log',
+        name: 'OperationLog',
+        component: () => import('@/views/OperationLog.vue'),
+        meta: { title: '操作日志', roles: ['ADMIN', 'PROJECT_LEAD'] }
+      },
+      {
         path: 'conflict',
         name: 'ConflictList',
         component: () => import('@/views/ConflictList.vue'),

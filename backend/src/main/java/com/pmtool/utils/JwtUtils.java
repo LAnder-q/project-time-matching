@@ -36,9 +36,10 @@ public class JwtUtils {
      * @param userId   用户ID
      * @param username 用户名
      * @param role     角色
+     * @param realName 真实姓名（用于操作日志记录）
      * @return JWT token 字符串
      */
-    public String generateToken(Long userId, String username, String role) {
+    public String generateToken(Long userId, String username, String role, String realName) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -46,6 +47,7 @@ public class JwtUtils {
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .claim("role", role)
+                .claim("realName", realName == null ? username : realName)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())

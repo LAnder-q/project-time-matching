@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -67,21 +68,23 @@ public class PersonnelServiceImpl extends ServiceImpl<PersonnelMapper, Personnel
     public List<Personnel> importPersonnel(List<Personnel> personnelList) {
         List<Personnel> result = new ArrayList<>();
         for (Personnel personnel : personnelList) {
-            // 加密工号后查询
+            // 加密工号后查询；同时兼容历史数据（早期版本双重加密、以及 init.sql 明文种子数据）
             String encryptedEmpNo = DataEncryptUtils.encrypt(personnel.getEmpNo());
             LambdaQueryWrapper<Personnel> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Personnel::getEmpNo, encryptedEmpNo);
+            wrapper.eq(Personnel::getEmpNo, encryptedEmpNo)
+                    .or()
+                    .eq(Personnel::getEmpNo, personnel.getEmpNo())
+                    .or()
+                    .eq(Personnel::getEmpNo, DataEncryptUtils.encrypt(encryptedEmpNo));
             Personnel existing = this.getOne(wrapper, false);
             if (existing != null) {
                 personnel.setId(existing.getId());
-                encryptFields(personnel);
+                // 由 updateById 统一处理加密与返回前解密
                 this.updateById(personnel);
             } else {
-                encryptFields(personnel);
+                // 由 save 统一处理加密与返回前解密
                 this.save(personnel);
             }
-            // 返回前解密
-            decryptFields(personnel);
             result.add(personnel);
         }
         return result;
@@ -90,13 +93,19 @@ public class PersonnelServiceImpl extends ServiceImpl<PersonnelMapper, Personnel
     @Override
     public boolean save(Personnel personnel) {
         encryptFields(personnel);
-        return super.save(personnel);
+        boolean ok = super.save(personnel);
+        // 返回前解密，避免接口响应携带密文
+        decryptFields(personnel);
+        return ok;
     }
 
     @Override
     public boolean updateById(Personnel personnel) {
         encryptFields(personnel);
-        return super.updateById(personnel);
+        boolean ok = super.updateById(personnel);
+        // 返回前解密，避免接口响应携带密文
+        decryptFields(personnel);
+        return ok;
     }
 
     @Override
@@ -109,6 +118,13 @@ public class PersonnelServiceImpl extends ServiceImpl<PersonnelMapper, Personnel
     @Override
     public List<Personnel> list() {
         List<Personnel> list = super.list();
+        list.forEach(this::decryptFields);
+        return list;
+    }
+
+    @Override
+    public List<Personnel> listByIds(Collection<? extends Serializable> idList) {
+        List<Personnel> list = super.listByIds(idList);
         list.forEach(this::decryptFields);
         return list;
     }

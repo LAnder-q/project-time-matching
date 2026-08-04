@@ -41,7 +41,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 生成 JWT Token
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole(), user.getRealName());
 
         return new LoginVO(token, user.getId(), user.getUsername(), user.getRealName(), user.getRole());
     }

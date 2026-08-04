@@ -69,13 +69,20 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
                     .collect(Collectors.toList());
         }
 
+        // 预加载人员和项目信息，避免循环内逐条查询（大数据量下减少 DB 往返）
+        Map<Long, Personnel> personnelMap = personnelService.list().stream()
+                .collect(Collectors.toMap(Personnel::getId, p -> p));
+        Map<Long, Project> projectMap = projectService.list().stream()
+                .collect(Collectors.toMap(Project::getId, p -> p));
+
         // 按 personnel_id 分组
         Map<Long, List<Assignment>> grouped = allAssignments.stream()
                 .collect(Collectors.groupingBy(Assignment::getPersonnelId));
 
         List<ConflictResult> results = new ArrayList<>();
         for (Map.Entry<Long, List<Assignment>> entry : grouped.entrySet()) {
-            ConflictResult result = detectConflictsForPersonnel(entry.getKey(), entry.getValue());
+            ConflictResult result = detectConflictsForPersonnel(
+                    entry.getKey(), entry.getValue(), personnelMap, projectMap);
             if (result.getConflicts() != null && !result.getConflicts().isEmpty()) {
                 results.add(result);
             }
@@ -89,25 +96,38 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
         wrapper.eq(Assignment::getPersonnelId, personnelId);
         wrapper.orderByAsc(Assignment::getStartDate);
         List<Assignment> assignments = assignmentService.list(wrapper);
-        return detectConflictsForPersonnel(personnelId, assignments);
+
+        Map<Long, Personnel> personnelMap = new HashMap<>();
+        Personnel personnel = personnelService.getById(personnelId);
+        if (personnel != null) {
+            personnelMap.put(personnelId, personnel);
+        }
+        Map<Long, Project> projectMap = getProjectMap(assignments);
+        return detectConflictsForPersonnel(personnelId, assignments, personnelMap, projectMap);
     }
 
     /**
      * 检测指定人员分配列表中的冲突
      */
-    private ConflictResult detectConflictsForPersonnel(Long personnelId, List<Assignment> assignments) {
+    private ConflictResult detectConflictsForPersonnel(Long personnelId, List<Assignment> assignments,
+                                                       Map<Long, Personnel> personnelMap,
+                                                       Map<Long, Project> projectMap) {
         ConflictResult result = new ConflictResult();
         result.setPersonnelId(personnelId);
 
         // 获取人员信息
-        Personnel personnel = personnelService.getById(personnelId);
+        Personnel personnel = personnelMap.get(personnelId);
         result.setPersonnelName(personnel != null ? personnel.getName() : "未知人员");
         result.setEmpNo(personnel != null ? personnel.getEmpNo() : "未知");
 
         List<ConflictDetail> conflicts = new ArrayList<>();
 
         // 获取所有相关项目名称
-        Map<Long, String> projectNameMap = getProjectNameMap(assignments);
+        Map<Long, String> projectNameMap = new HashMap<>();
+        for (Assignment a : assignments) {
+            Project project = projectMap.get(a.getProjectId());
+            projectNameMap.putIfAbsent(a.getProjectId(), project != null ? project.getName() : "未知项目");
+        }
 
         // 两两比较所有分配的时间区间
         for (int i = 0; i < assignments.size(); i++) {
@@ -268,6 +288,10 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
         // 预加载所有人员和分配记录，避免在循环中反复查询
         List<Personnel> allPersonnel = personnelService.list();
         List<Assignment> allAssignments = assignmentService.list();
+        Map<Long, Personnel> personnelMap = allPersonnel.stream()
+                .collect(Collectors.toMap(Personnel::getId, p -> p));
+        Map<Long, Project> projectMap = projectService.list().stream()
+                .collect(Collectors.toMap(Project::getId, p -> p));
 
         // 2. 对每个冲突生成调优建议
         for (ConflictResult cr : conflictResults) {
@@ -275,12 +299,12 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             if (personnelId == null || cr.getConflicts() == null) {
                 continue;
             }
-            Personnel conflictPersonnel = personnelService.getById(personnelId);
+            Personnel conflictPersonnel = personnelMap.get(personnelId);
 
             for (ConflictDetail cd : cr.getConflicts()) {
                 // 查找冲突涉及的两个项目，比较优先级
-                Project project1 = projectService.getById(cd.getProjectId1());
-                Project project2 = projectService.getById(cd.getProjectId2());
+                Project project1 = projectMap.get(cd.getProjectId1());
+                Project project2 = projectMap.get(cd.getProjectId2());
                 if (project1 == null || project2 == null) {
                     continue;
                 }
@@ -380,9 +404,14 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             return candidates;
         }
 
-        // 构建技能要求集：取冲突人员技能（项目已取消所需岗位字段，人员身兼数职不再按岗位硬过滤）
-        Set<String> requiredSkills = parseSkills(conflictPersonnel.getSkills());
-        if (requiredSkills.isEmpty()) {
+        // 构建匹配需求集：优先使用项目的所需岗位（requiredPosition），
+        // 匹配候选人的岗位（positions）；若项目未设置所需岗位则回退到冲突人员技能匹配候选人技能
+        Set<String> requiredSet = parseSkills(lowerProject.getRequiredPosition());
+        boolean matchByPosition = !requiredSet.isEmpty();
+        if (requiredSet.isEmpty() && conflictPersonnel != null) {
+            requiredSet = parseSkills(conflictPersonnel.getSkills());
+        }
+        if (requiredSet.isEmpty()) {
             return candidates;
         }
 
@@ -403,11 +432,14 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
                 continue;
             }
 
-            // 技能匹配算法：计算交集比例
-            Set<String> candidateSkills = parseSkills(candidate.getSkills());
-            double matchScore = calculateMatchScore(requiredSkills, candidateSkills);
+            // 技能/岗位匹配算法：计算交集比例（Jaccard 相似度）
+            // 按岗位匹配时用候选人的 positions，按技能匹配时用候选人的 skills
+            Set<String> candidateSet = matchByPosition
+                    ? parseSkills(candidate.getPositions())
+                    : parseSkills(candidate.getSkills());
+            double matchScore = calculateMatchScore(requiredSet, candidateSet);
             if (matchScore <= 0) {
-                continue;  // 无技能交集，跳过
+                continue;  // 无交集，跳过
             }
 
             // 计算在项目周期内的可用率
@@ -433,8 +465,8 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
             rc.setMatchScore(matchScore);
             rc.setAvailabilityRate(availabilityRate);
             rc.setRecommendationLevel(recommendationLevel);
-            rc.setReason(String.format("技能匹配度 %.0f%%，项目周期内可用率 %.0f%%（%s 至 %s）",
-                    matchScore, availabilityRate, projectStart, projectEnd));
+            rc.setReason(String.format("%s匹配度 %.0f%%，项目周期内可用率 %.0f%%（%s 至 %s）",
+                    matchByPosition ? "岗位" : "技能", matchScore, availabilityRate, projectStart, projectEnd));
             candidates.add(rc);
         }
 
@@ -537,19 +569,16 @@ public class ConflictDetectionServiceImpl implements ConflictDetectionService {
     }
 
     /**
-     * 获取分配列表中涉及的项目名称映射
+     * 获取分配列表中涉及的项目映射
      */
-    private Map<Long, String> getProjectNameMap(List<Assignment> assignments) {
+    private Map<Long, Project> getProjectMap(List<Assignment> assignments) {
         Set<Long> projectIds = assignments.stream()
                 .map(Assignment::getProjectId)
                 .collect(Collectors.toSet());
-        Map<Long, String> map = new HashMap<>();
-        for (Long projectId : projectIds) {
-            Project project = projectService.getById(projectId);
-            if (project != null) {
-                map.put(projectId, project.getName());
-            }
+        if (projectIds.isEmpty()) {
+            return new HashMap<>();
         }
-        return map;
+        return projectService.listByIds(projectIds).stream()
+                .collect(Collectors.toMap(Project::getId, p -> p));
     }
 }

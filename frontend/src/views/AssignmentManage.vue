@@ -73,8 +73,15 @@
         <el-table-column prop="startDate" label="开始日期" width="130" />
         <el-table-column prop="endDate" label="结束日期" width="130" />
         <el-table-column prop="dailyHours" label="每日工时" width="100" align="center" />
-        <el-table-column label="操作" width="160" fixed="right" align="center">
+        <el-table-column prop="version" label="版本号" width="90" align="center">
+          <template #default="{ row }">{{ row.version ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="operator" label="操作人" width="110">
+          <template #default="{ row }">{{ row.operator || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button type="info" link @click="openHistory(row)">历史</el-button>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
@@ -166,6 +173,26 @@
         <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 调整历史对话框 -->
+    <el-dialog v-model="historyVisible" :title="historyTitle" width="780px">
+      <el-table v-loading="historyLoading" :data="historyRows" border size="small">
+        <el-table-column label="操作" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="logActionTagType(row.action)" size="small">
+              {{ logActionText(row.action) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作人" prop="operator" width="120" />
+        <el-table-column label="操作时间" prop="operateTime" width="180" />
+        <el-table-column label="版本号" prop="version" width="80" align="center" />
+        <el-table-column label="变更内容" prop="change" min-width="280" show-overflow-tooltip />
+      </el-table>
+      <template #footer>
+        <el-button @click="historyVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -176,12 +203,21 @@ import {
   getAssignmentPage,
   createAssignment,
   updateAssignment,
-  deleteAssignment
+  deleteAssignment,
+  getAssignmentLogs,
+  type OperationLog
 } from '@/api/assignment'
 import { getPersonnelAll } from '@/api/personnel'
 import { getProjectAll } from '@/api/project'
 import { getDepartmentTree, type DepartmentVO } from '@/api/department'
 import type { Assignment, Personnel, Project } from '@/types'
+import {
+  parseAssignJson,
+  describeAssignChange,
+  assignLogVersion,
+  logActionText,
+  logActionTagType
+} from '@/utils/assignmentLog'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -201,6 +237,14 @@ const filterProjectId = ref<number | undefined>(undefined)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
+
+// 调整历史
+const historyVisible = ref(false)
+const historyLoading = ref(false)
+const historyTitle = ref('调整历史')
+const historyRows = ref<
+  { id: number; action: string; operator: string; operateTime: string; version: number | string; change: string }[]
+>([])
 
 const defaultForm = (): Assignment & { deptId?: number | null } => ({
   personnelId: undefined as unknown as number,
@@ -386,6 +430,37 @@ async function handleSubmit() {
       submitting.value = false
     }
   })
+}
+
+// ==================== 调整历史 ====================
+
+async function openHistory(row: Assignment) {
+  historyVisible.value = true
+  historyLoading.value = true
+  historyTitle.value = `调整历史 - ${row.personnelName || ''} / ${row.projectName || ''}`
+  try {
+    const logs = await getAssignmentLogs(row.id!)
+    const resolver = {
+      personnel: (id: unknown) => personnelOptions.value.find((p) => p.id === id)?.name || '',
+      project: (id: unknown) => projectOptions.value.find((p) => p.id === id)?.name || ''
+    }
+    historyRows.value = logs.map((log: OperationLog) => {
+      const oldObj = parseAssignJson(log.oldValue)
+      const newObj = parseAssignJson(log.newValue)
+      return {
+        id: log.id,
+        action: log.action,
+        operator: log.operator || '-',
+        operateTime: log.operateTime ? log.operateTime.replace('T', ' ') : '-',
+        version: assignLogVersion(log.action, oldObj, newObj),
+        change: describeAssignChange(log.action, oldObj, newObj, resolver)
+      }
+    })
+  } catch {
+    historyRows.value = []
+  } finally {
+    historyLoading.value = false
+  }
 }
 
 onMounted(() => {

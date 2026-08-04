@@ -364,7 +364,7 @@
     <li class="toc-sub"><a href="#algo-conflict">6.1 冲突检测算法</a></li>
     <li class="toc-sub"><a href="#algo-severity">6.2 严重程度分级</a></li>
     <li class="toc-sub"><a href="#algo-suggestion">6.3 调优建议算法</a></li>
-    <li class="toc-sub"><a href="#algo-match">6.4 技能匹配算法</a></li>
+    <li class="toc-sub"><a href="#algo-match">6.4 岗位/技能匹配算法</a></li>
     <li class="toc-sub"><a href="#algo-availability">6.5 可用率计算</a></li>
     <li class="toc-sub"><a href="#algo-dept">6.6 部门树构建</a></li>
     <li class="toc-sub"><a href="#algo-flow">6.7 完整流程</a></li>
@@ -378,8 +378,9 @@
     <li class="toc-sub"><a href="#backend-common">7.7 通用组件</a></li>
     <li><a href="#frontend-files">8. 前端文件说明</a></li>
     <li class="toc-sub"><a href="#frontend-views">8.1 视图组件</a></li>
-    <li class="toc-sub"><a href="#frontend-api">8.2 API 层</a></li>
-    <li class="toc-sub"><a href="#frontend-core">8.3 核心模块</a></li>
+    <li class="toc-sub"><a href="#frontend-api">8.3 API 层</a></li>
+    <li class="toc-sub"><a href="#frontend-core">8.4 核心模块</a></li>
+    <li class="toc-sub"><a href="#frontend-utils">8.5 工具模块</a></li>
     <li><a href="#api-endpoints">9. API 接口汇总</a></li>
     <li><a href="#security">10. 安全与权限模型</a></li>
     <li><a href="#config">11. 配置说明</a></li>
@@ -393,8 +394,8 @@
     <h1>人员-项目时间匹配管理工具</h1>
     <p class="subtitle">技术文档 — 含文件说明、物理模型与逻辑模型</p>
     <div class="meta">
-      <span>版本: 1.0.0</span>
-      <span>日期: 2026-08-03</span>
+      <span>版本: 1.1.0</span>
+      <span>日期: 2026-08-04</span>
       <span>架构: 前后端分离</span>
     </div>
   </header>
@@ -413,7 +414,8 @@
           <li>时间冲突自动检测（按重叠天数分级）</li>
           <li>智能调优建议（工时调整 / 替代人员推荐）</li>
           <li>日历可视化展示分配情况</li>
-          <li>PDF 报表导出</li>
+          <li>报表导出（Excel / PDF）</li>
+          <li>分配调整历史追溯（单条历史 + 全局操作日志 + 日志导出）</li>
         </ul>
       </div>
       <div class="card">
@@ -421,7 +423,7 @@
         <ul style="padding-left: 1.2rem; font-size: 0.9rem;">
           <li>三级角色权限控制（ADMIN / PROJECT_LEAD / USER）</li>
           <li>JWT Token 认证 + 方法级权限注解</li>
-          <li>敏感数据 AES 加密存储</li>
+          <li>敏感字段（人员工号、项目名称）AES 加密存储</li>
           <li>操作日志审计（留存 ≥ 24 个月）</li>
           <li>逻辑删除保护数据完整性</li>
           <li>乐观锁控制分配版本</li>
@@ -463,12 +465,12 @@
 
     <div class="arch-layer arch-layer-1">
       <div class="arch-layer-title">前端展示层 (Vue 3 + Element Plus)</div>
-      <div class="arch-layer-items">Login · Dashboard · PersonnelManage · ProjectManage · AssignmentManage · ConflictList · CalendarView · DepartmentManage</div>
+      <div class="arch-layer-items">Login · Dashboard · PersonnelManage · ProjectManage · AssignmentManage · OperationLog · ConflictList · CalendarView · DepartmentManage</div>
     </div>
     <div class="arch-arrow">↓ Axios HTTP / JWT Token</div>
     <div class="arch-layer arch-layer-2">
       <div class="arch-layer-title">后端控制层 (Controller)</div>
-      <div class="arch-layer-items">AuthController · PersonnelController · ProjectController · AssignmentController · ConflictController · DepartmentController · ReportController</div>
+      <div class="arch-layer-items">AuthController · PersonnelController · ProjectController · AssignmentController · ConflictController · DepartmentController · ReportController · OperationLogController</div>
     </div>
     <div class="arch-arrow">↓ 调用</div>
     <div class="arch-layer arch-layer-3">
@@ -544,7 +546,9 @@
           <div class="er-field"><span>start_date</span> <span class="er-type">DATE</span></div>
           <div class="er-field"><span>end_date</span> <span class="er-type">DATE</span></div>
           <div class="er-field"><span>priority</span> <span class="er-type">INT (1-5)</span></div>
+          <div class="er-field"><span>required_position</span> <span class="er-type">VARCHAR(200)</span></div>
           <div class="er-field"><span>daily_hours</span> <span class="er-type">DECIMAL(5,1)</span></div>
+          <div class="er-field"><span>weekly_hours</span> <span class="er-type">DECIMAL(5,1)</span></div>
           <div class="er-field"><span>deleted</span> <span class="er-type">TINYINT</span></div>
           <div class="er-field"><span>create_time</span> <span class="er-type">DATETIME</span></div>
           <div class="er-field"><span>update_time</span> <span class="er-type">DATETIME</span></div>
@@ -618,7 +622,7 @@
       <thead><tr><th>字段</th><th>类型</th><th>约束</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td>id</td><td>BIGINT</td><td>PK, AUTO_INCREMENT</td><td>主键</td></tr>
-        <tr><td>emp_no</td><td>VARCHAR(50)</td><td>NOT NULL, UNIQUE (uk_emp_no)</td><td>工号（唯一）</td></tr>
+        <tr><td>emp_no</td><td>VARCHAR(50)</td><td>NOT NULL, UNIQUE (uk_emp_no)</td><td>工号（唯一，AES 加密存储，读取自动解密）</td></tr>
         <tr><td>name</td><td>VARCHAR(100)</td><td>NOT NULL</td><td>姓名</td></tr>
         <tr><td>positions</td><td>VARCHAR(200)</td><td>—</td><td>岗位（逗号分隔，支持身兼数职）</td></tr>
         <tr><td>skills</td><td>VARCHAR(500)</td><td>—</td><td>技能（逗号分隔）</td></tr>
@@ -636,11 +640,13 @@
       <thead><tr><th>字段</th><th>类型</th><th>约束</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td>id</td><td>BIGINT</td><td>PK, AUTO_INCREMENT</td><td>主键</td></tr>
-        <tr><td>name</td><td>VARCHAR(200)</td><td>NOT NULL</td><td>项目名称</td></tr>
+        <tr><td>name</td><td>VARCHAR(200)</td><td>NOT NULL</td><td>项目名称（AES 加密存储，读取自动解密）</td></tr>
         <tr><td>start_date</td><td>DATE</td><td>NOT NULL</td><td>项目开始日期</td></tr>
         <tr><td>end_date</td><td>DATE</td><td>NOT NULL</td><td>项目结束日期</td></tr>
         <tr><td>priority</td><td>INT</td><td>DEFAULT 3</td><td>优先级 1-5，5 最高</td></tr>
+        <tr><td>required_position</td><td>VARCHAR(200)</td><td>—</td><td>所需人员岗位（逗号分隔，如：运维工程师,DBA）</td></tr>
         <tr><td>daily_hours</td><td>DECIMAL(5,1)</td><td>DEFAULT 8.0</td><td>每日所需工时</td></tr>
+        <tr><td>weekly_hours</td><td>DECIMAL(5,1)</td><td>DEFAULT 40.0</td><td>每周所需工时</td></tr>
         <tr><td>deleted</td><td>TINYINT</td><td>DEFAULT 0</td><td>逻辑删除标志</td></tr>
         <tr><td>create_time</td><td>DATETIME</td><td>DEFAULT CURRENT_TIMESTAMP</td><td>创建时间</td></tr>
         <tr><td>update_time</td><td>DATETIME</td><td>ON UPDATE CURRENT_TIMESTAMP</td><td>更新时间</td></tr>
@@ -658,7 +664,7 @@
         <tr><td>end_date</td><td>DATE</td><td>NOT NULL</td><td>分配结束日期</td></tr>
         <tr><td>daily_hours</td><td>DECIMAL(5,1)</td><td>DEFAULT 8.0</td><td>每日工时</td></tr>
         <tr><td>version</td><td>INT</td><td>DEFAULT 1</td><td>版本号（乐观锁）</td></tr>
-        <tr><td>operator</td><td>VARCHAR(100)</td><td>—</td><td>操作人</td></tr>
+        <tr><td>operator</td><td>VARCHAR(100)</td><td>—</td><td>最近一次操作人（后端从登录令牌解析，真实姓名优先）</td></tr>
         <tr><td>deleted</td><td>TINYINT</td><td>DEFAULT 0</td><td>逻辑删除标志</td></tr>
         <tr><td>create_time</td><td>DATETIME</td><td>DEFAULT CURRENT_TIMESTAMP</td><td>创建时间</td></tr>
         <tr><td>update_time</td><td>DATETIME</td><td>ON UPDATE CURRENT_TIMESTAMP</td><td>更新时间</td></tr>
@@ -725,17 +731,17 @@
 
     <div class="card">
       <div class="card-title">Project（项目）</div>
-      <p>项目实体含时间区间 (<code>start_date</code> / <code>end_date</code>)、优先级 (<code>priority</code> 1-5) 和每日工时需求 (<code>daily_hours</code>)。优先级是冲突调优建议的关键决策依据——低优先级项目优先调整。</p>
+      <p>项目实体含时间区间 (<code>start_date</code> / <code>end_date</code>)、优先级 (<code>priority</code> 1-5)、所需岗位 (<code>required_position</code>，逗号分隔)、每日工时 (<code>daily_hours</code>) 和每周工时 (<code>weekly_hours</code>)。优先级是冲突调优建议的关键决策依据——低优先级项目优先调整。所需岗位用于替代人员推荐时的岗位匹配。</p>
     </div>
 
     <div class="card">
       <div class="card-title">Assignment（分配）</div>
-      <p>人员-项目的多对多关联表，是冲突检测的核心数据源。每条记录代表一名人员在某项目的时间段分配。<code>version</code> 字段用于乐观锁控制并发修改。冲突检测算法基于此表的时间区间两两比较。</p>
+      <p>人员-项目的多对多关联表，是冲突检测的核心数据源。每条记录代表一名人员在某项目的时间段分配。<code>version</code> 字段用于乐观锁控制并发修改，每次修改 +1。冲突检测算法基于此表的时间区间两两比较。新增/修改/删除均写入操作日志，实现完整追溯。</p>
     </div>
 
     <div class="card">
       <div class="card-title">OperationLog（操作日志）</div>
-      <p>审计实体，记录所有增删改操作的旧值/新值 JSON。定时任务每月归档超过 24 个月的日志（标记 <code>ARCHIVED_</code> 前缀）。</p>
+      <p>审计实体，记录分配新增/修改/删除操作的旧值/新值 JSON 快照。操作人由后端从登录令牌解析（真实姓名优先，其次用户名）；日期字段以 ISO 字符串存储。定时任务每月归档超过 24 个月的日志（标记 <code>ARCHIVED_</code> 前缀）。</p>
     </div>
 
     <div class="card">
@@ -751,7 +757,7 @@
     <p>系统对每个冲突生成两类调优建议：</p>
     <ul style="padding-left: 1.2rem; font-size: 0.9rem;">
       <li><strong>ADJUST_HOURS（工时调整）</strong>：建议在低优先级项目上减少工时或调整时间避开冲突时段</li>
-      <li><strong>REPLACE_PERSONNEL（替代人员）</strong>：搜索技能匹配的其他人员作为替代候选人，按 Jaccard 相似度计算技能匹配度，按项目周期可用率分三档推荐（RECOMMENDED / CONSIDERABLE / NOT_RECOMMENDED）</li>
+      <li><strong>REPLACE_PERSONNEL（替代人员）</strong>：优先使用项目 <code>requiredPosition</code>（所需岗位）与候选人员 <code>positions</code> 计算岗位匹配度（Jaccard 相似度）；若项目未设置所需岗位则回退到冲突人员技能匹配。按项目周期可用率分三档推荐（RECOMMENDED / CONSIDERABLE / NOT_RECOMMENDED）</li>
     </ul>
   </section>
 
@@ -782,7 +788,7 @@ for (int i = 0; i &lt; assignments.size(); i++) {
         }
     }
 }</code></pre>
-    <p><strong>时间复杂度</strong>：设某人员有 n 条分配记录，两两比较需要 O(n²) 次判定；全量检测时对所有人员求和。由于单人的分配记录通常不超过 10 条，实际性能完全可接受。</p>
+    <p><strong>时间复杂度</strong>：设某人员有 n 条分配记录，两两比较需要 O(n²) 次判定；全量检测时对所有人员求和。由于单人的分配记录通常不超过 10 条，实际性能完全可接受。全量检测与调优建议生成时会预加载人员/项目映射，避免循环内逐条查库（消除 N+1 查询），满足大数据量（≥1000 人 / 50 个项目）下的响应要求。</p>
 
     <h3 id="algo-severity">6.2 严重程度分级算法</h3>
     <p>根据重叠天数将冲突划分为三档严重程度，作为冲突清单排序与处理优先级的依据。</p>
@@ -811,21 +817,32 @@ Project lower  = (p1 &lt;= p2) ? project1 : project2;  // 低优先级
 Project higher = (p1 &lt;= p2) ? project2 : project1;  // 高优先级
 
 // 2. 建议 A：调整低优先级项目的工时/时间，避开冲突时段
-// 3. 建议 B：为低优先级项目搜索技能匹配的替代人员
+// 3. 建议 B：为低优先级项目搜索岗位/技能匹配的替代人员
 List&lt;ReplacementCandidate&gt; candidates =
     findReplacementCandidates(personnelId, personnel, lower, ...);</code></pre>
     <p>替代人员筛选流程：</p>
     <ol style="padding-left: 1.2rem; font-size: 0.9rem;">
       <li>排除冲突人员自身</li>
-      <li>计算技能匹配度（Jaccard 相似度），无技能交集直接跳过</li>
+      <li>优先用项目 <code>requiredPosition</code> 与候选人 <code>positions</code> 计算岗位匹配度（Jaccard 相似度）；项目无所需岗位时回退到技能匹配。无交集直接跳过</li>
       <li>计算候选人在低优先级项目完整周期内的可用率</li>
       <li>分档：RECOMMENDED（可用率 ≥ 80% 且匹配度 ≥ 50%）、CONSIDERABLE（可用率 ≥ 50% 或匹配度 ≥ 30%）、NOT_RECOMMENDED（其余）</li>
       <li>排序：档位优先，同档内按可用率降序</li>
     </ol>
 
-    <h3 id="algo-match">6.4 技能匹配算法（Jaccard 相似度）</h3>
-    <p>将人员技能字符串按逗号分割为集合（忽略大小写、去除空白），计算冲突人员技能集合与候选人员技能集合的 <strong>Jaccard 相似度</strong>，返回 0-100 的匹配分。</p>
-    <pre><code>matchScore = |skills1 ∩ skills2| / |skills1 ∪ skills2| × 100</code></pre>
+    <h3 id="algo-match">6.4 岗位/技能匹配算法（Jaccard 相似度）</h3>
+    <p>替代人员推荐时，系统优先使用低优先级项目的 <code>requiredPosition</code>（所需岗位）构建需求集，与候选人员的 <code>positions</code>（岗位）集合计算 <strong>Jaccard 相似度</strong>。若项目未设置所需岗位，则回退到使用冲突人员的 <code>skills</code>（技能）与候选人员的 <code>skills</code> 进行匹配。将字符串按逗号分割为集合（忽略大小写、去除空白），返回 0-100 的匹配分。</p>
+    <pre><code>// 1. 优先用项目所需岗位匹配，回退到技能匹配
+Set&lt;String&gt; requiredSet = parseSkills(lowerProject.getRequiredPosition());
+boolean matchByPosition = !requiredSet.isEmpty();
+if (requiredSet.isEmpty() && conflictPersonnel != null) {
+    requiredSet = parseSkills(conflictPersonnel.getSkills());
+}
+// 2. 候选人集合：按岗位匹配用 positions，按技能匹配用 skills
+Set&lt;String&gt; candidateSet = matchByPosition
+        ? parseSkills(candidate.getPositions())
+        : parseSkills(candidate.getSkills());
+// 3. Jaccard 相似度
+matchScore = |requiredSet ∩ candidateSet| / |requiredSet ∪ candidateSet| × 100</code></pre>
     <pre><code>private double calculateMatchScore(Set&lt;String&gt; s1, Set&lt;String&gt; s2) {
     if (s1.isEmpty() || s2.isEmpty()) return 0;
     Set&lt;String&gt; intersection = new HashSet&lt;&gt;(s1);
@@ -890,8 +907,8 @@ flowchart TD
     F --> G[按重叠天数分级 HIGH / MEDIUM / LOW]
     G --> H[确定低优先级项目]
     H --> I[生成 ADJUST_HOURS 工时调整建议]
-    H --> J[搜索技能匹配的替代人员]
-    J --> K[计算 Jaccard 技能匹配度]
+    H --> J[搜索岗位/技能匹配的替代人员]
+    J --> K[计算 Jaccard 岗位/技能匹配度]
     J --> L[计算项目周期可用率]
     K --> M[分档 RECOMMENDED / CONSIDERABLE / NOT_RECOMMENDED]
     L --> M
@@ -923,7 +940,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-entity">Entity</span> entity/Project.java</div>
-      <div class="file-desc">项目实体。映射 <code>project</code> 表，含项目名称、起止日期、优先级(1-5)、每日工时。优先级是冲突调优的关键决策字段。</div>
+      <div class="file-desc">项目实体。映射 <code>project</code> 表，含项目名称、起止日期、优先级(1-5)、所需岗位(required_position)、每日工时、每周工时。优先级是冲突调优的关键决策字段，所需岗位用于替代人员推荐的岗位匹配。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-entity">Entity</span> entity/Assignment.java</div>
@@ -953,7 +970,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Controller</span> controller/AssignmentController.java</div>
-      <div class="file-desc">分配管理控制器。提供人员-项目分配的查询、新增、修改、删除接口。新增/修改时记录操作人信息并写入版本号。</div>
+      <div class="file-desc">分配管理控制器。提供人员-项目分配的查询、新增、修改、删除接口，以及 <code>GET /assignment/{id}/logs</code>（单条分配调整历史）。新增/修改/删除均记录操作日志，操作人由后端从登录令牌解析（真实姓名优先），不依赖前端传参。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Controller</span> controller/ConflictController.java</div>
@@ -965,7 +982,11 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Controller</span> controller/ReportController.java</div>
-      <div class="file-desc">报表控制器。提供报表数据查询和 PDF 导出接口。使用 iText 7 生成 PDF 文件，支持中文字体。</div>
+      <div class="file-desc">报表控制器。提供三种报表（人员时间分配表 / 项目人员冲突报表 / 人员利用率统计）的 Excel 与 PDF 导出接口。使用 EasyExcel 生成 Excel、iText 7 生成 PDF，支持中文字体。</div>
+    </div>
+    <div class="file-entry">
+      <div class="file-path"><span class="badge badge-backend">Controller</span> controller/OperationLogController.java</div>
+      <div class="file-desc">操作日志控制器。提供全局操作日志分页查询（可按操作人、操作类型、涉及人员筛选，涉及人员通过日志 JSON 快照匹配）和 Excel/PDF 导出接口。仅 ADMIN / PROJECT_LEAD 可访问。</div>
     </div>
 
     <h3 id="backend-service">7.3 服务层 (service)</h3>
@@ -975,19 +996,19 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Service</span> service/PersonnelService.java + impl/PersonnelServiceImpl.java</div>
-      <div class="file-desc">人员服务。继承 MyBatis-Plus IService，提供分页查询（支持按姓名、工号、部门筛选）、Excel 批量导入（按工号存在则更新、不存在则新增、按部门名称匹配 dept_id）。</div>
+      <div class="file-desc">人员服务。继承 MyBatis-Plus IService，提供分页查询（支持按姓名、工号、部门筛选）、Excel 批量导入（按工号存在则更新、不存在则新增、按部门名称匹配 dept_id）。工号（emp_no）使用 AES 加密存储、读取时自动解密；批量导入查重兼容历史明文/双重加密数据；getById / list / listByIds 均返回解密后的工号。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Service</span> service/ProjectService.java + impl/ProjectServiceImpl.java</div>
-      <div class="file-desc">项目服务。继承 MyBatis-Plus IService，提供分页查询（支持按名称筛选）和 Excel 批量导入。</div>
+      <div class="file-desc">项目服务。继承 MyBatis-Plus IService，提供分页查询（支持按名称筛选）和 Excel 批量导入。项目名称使用 AES 加密存储、读取时自动解密；因密文无法做 SQL LIKE，名称搜索改为全量解密后内存过滤（项目规模小，性能可接受）。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Service</span> service/AssignmentService.java + impl/AssignmentServiceImpl.java</div>
-      <div class="file-desc">分配服务。继承 MyBatis-Plus IService，提供分页查询（联表查询人员姓名/工号/项目名称）和分配管理。新增分配时自动设置版本号和操作人。</div>
+      <div class="file-desc">分配服务。继承 MyBatis-Plus IService，提供分页查询（联表查询人员姓名/工号/项目名称）和分配管理。新增时版本号置 1、修改时版本号 +1；新增/修改/删除均写入操作日志（旧值/新值 JSON 快照，日期以 ISO 字符串存储）；操作人由后端解析。另提供单条分配的调整历史查询。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Service</span> service/ConflictDetectionService.java + impl/ConflictDetectionServiceImpl.java</div>
-      <div class="file-desc"><strong>核心服务</strong>。实现冲突检测算法（时间区间重叠判定 + 严重程度分级）、日历数据生成（项目颜色分配）、调优建议生成（工时调整建议 + 替代人员推荐）。替代人员推荐基于 Jaccard 技能匹配度和项目周期可用率计算。</div>
+      <div class="file-desc"><strong>核心服务</strong>。实现冲突检测算法（时间区间重叠判定 + 严重程度分级）、日历数据生成（项目颜色分配）、调优建议生成（工时调整建议 + 替代人员推荐）。替代人员推荐优先按项目所需岗位(requiredPosition)匹配候选人岗位，回退到技能匹配，基于 Jaccard 相似度和项目周期可用率分三档推荐。全量检测与建议生成预加载人员/项目映射，消除 N+1 查询。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">Service</span> service/DepartmentService.java + impl/DepartmentServiceImpl.java</div>
@@ -1043,7 +1064,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">DTO</span> dto/ProjectImportDTO.java</div>
-      <div class="file-desc">项目 Excel 导入 DTO。使用 EasyExcel 注解映射 Excel 列，含项目名称、起止日期、优先级、每日工时。</div>
+      <div class="file-desc">项目 Excel 导入 DTO。使用 EasyExcel 注解映射 Excel 列，含项目名称、起止日期、优先级、所需岗位、每日工时、每周工时（共 7 列）。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">DTO</span> dto/DepartmentVO.java</div>
@@ -1059,7 +1080,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">DTO</span> dto/ConflictSuggestion.java</div>
-      <div class="file-desc">调优建议 VO。含建议类型(ADJUST_HOURS/REPLACE_PERSONNEL)、描述、调整建议、替代候选人列表。内部类 ReplacementCandidate 含人员信息、技能匹配度、可用率、推荐档位。</div>
+      <div class="file-desc">调优建议 VO。含建议类型(ADJUST_HOURS/REPLACE_PERSONNEL)、描述、调整建议、替代候选人列表。内部类 ReplacementCandidate 含人员信息、岗位/技能匹配度、可用率、推荐档位。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-backend">DTO</span> dto/CalendarEvent.java</div>
@@ -1089,15 +1110,15 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-config">Interceptor</span> interceptor/JwtInterceptor.java</div>
-      <div class="file-desc">JWT 认证授权拦截器。从请求头提取 Bearer Token，验证有效性并解析 userId/username/role 注入 request 属性。同时解析 <code>@RequireRole</code> 注解进行方法级角色权限校验，权限不足返回 403。</div>
+      <div class="file-desc">JWT 认证授权拦截器。从请求头提取 Bearer Token，验证有效性并解析 userId/username/realName/role 注入 request 属性（操作人记录据此解析）。同时解析 <code>@RequireRole</code> 注解进行方法级角色权限校验，权限不足返回 403。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-config">Utils</span> utils/JwtUtils.java</div>
-      <div class="file-desc">JWT 工具类。使用 JJWT 库生成和解析 Token，密钥和过期时间从配置文件读取。Token 中携带 userId（subject）、username、role 信息。</div>
+      <div class="file-desc">JWT 工具类。使用 JJWT 库生成和解析 Token，密钥和过期时间从配置文件读取。Token 中携带 userId（subject）、username、role、realName 信息，供操作日志记录真实姓名。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-config">Utils</span> utils/DataEncryptUtils.java</div>
-      <div class="file-desc">数据加密工具类。使用 Hutool 的 AES 对称加密，密钥从配置文件读取（补齐到 32 字节）。提供 encrypt/decrypt 静态方法，解密失败时返回原文（兼容历史未加密数据）。</div>
+      <div class="file-desc">数据加密工具类。使用 Hutool 的 AES 对称加密，密钥从配置文件读取（补齐到 32 字节）。提供 encrypt/decrypt 静态方法，解密失败时返回原文（兼容历史未加密数据）。当前用于人员工号与项目名称的加密存储。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-config">Utils</span> utils/PdfExportUtils.java</div>
@@ -1117,7 +1138,7 @@ flowchart TD
     <h3>7.8 资源文件</h3>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-sql">SQL</span> resources/sql/init.sql</div>
-      <div class="file-desc">数据库初始化脚本。创建 pm_tool 数据库和 6 张表，插入初始管理员账号（3 个角色各一个）和测试数据（4 个部门、5 名人员、5 个项目、8 条分配记录含刻意冲突）。</div>
+      <div class="file-desc">数据库初始化脚本。创建 pm_tool 数据库和 6 张表，插入初始管理员账号（3 个角色各一个）和测试数据（4 个部门、5 名人员、5 个项目、9 条分配记录含刻意冲突、9 条与分配一一对应的新增操作日志，初始化后即可追溯）。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-config">Config</span> resources/application.yml</div>
@@ -1179,7 +1200,11 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">View</span> views/AssignmentManage.vue</div>
-      <div class="file-desc">分配管理页面。提供人员-项目分配列表（联表展示人员姓名/项目名称）、新增/编辑弹窗（选择人员和项目、设置时间区间和工时）、删除确认。</div>
+      <div class="file-desc">分配管理页面。提供人员-项目分配列表（联表展示人员姓名/工号/项目名称/版本号/操作人）、新增/编辑弹窗（选择人员和项目、设置时间区间和工时）、删除确认，以及每条分配的“历史”弹窗（展示该分配的完整调整记录：操作类型、操作人、时间、版本号、变更内容）。</div>
+    </div>
+    <div class="file-entry">
+      <div class="file-path"><span class="badge badge-frontend">View</span> views/OperationLog.vue</div>
+      <div class="file-desc">操作日志页面。展示全部分配的调整历史（分页），支持按涉及人员（含被替换前的原人员）、操作类型、操作人筛选，并可导出 Excel / PDF。仅 ADMIN / PROJECT_LEAD 可访问。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">View</span> views/ConflictList.vue</div>
@@ -1187,7 +1212,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">View</span> views/CalendarView.vue</div>
-      <div class="file-desc">日历视图页面。使用 FullCalendar 组件以日历形式展示人员-项目分配，支持按人员/项目/部门/时间区间筛选。不同项目使用不同颜色区分。</div>
+      <div class="file-desc">日历视图页面。使用 FullCalendar 组件以日历形式展示人员-项目分配，支持按人员/项目/部门/时间区间筛选，日/周/月/年视图切换。不同项目使用不同颜色区分，冲突以红色高亮；点击事件弹窗展示项目详情、工时与冲突提示。分配事件的结束日期按开区间 +1 天渲染，保证最后一个自然日正常展示。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">View</span> views/DepartmentManage.vue</div>
@@ -1223,7 +1248,7 @@ flowchart TD
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">API</span> api/assignment.ts</div>
-      <div class="file-desc">分配 API。封装分配 CRUD、分页查询接口调用。</div>
+      <div class="file-desc">分配 API。封装分配 CRUD、分页查询、单条分配调整历史查询（getAssignmentLogs）接口调用。</div>
     </div>
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">API</span> api/conflict.ts</div>
@@ -1236,6 +1261,10 @@ flowchart TD
     <div class="file-entry">
       <div class="file-path"><span class="badge badge-frontend">API</span> api/report.ts</div>
       <div class="file-desc">报表 API。封装报表数据查询和 PDF 导出接口调用。</div>
+    </div>
+    <div class="file-entry">
+      <div class="file-path"><span class="badge badge-frontend">API</span> api/operationLog.ts</div>
+      <div class="file-desc">操作日志 API。封装全局操作日志分页查询与 Excel/PDF 导出接口调用（导出通过 window.open + token query 参数触发下载）。</div>
     </div>
 
     <h3 id="frontend-core">8.4 核心模块 (router / stores / types)</h3>
@@ -1251,6 +1280,12 @@ flowchart TD
       <div class="file-path"><span class="badge badge-frontend">Types</span> types/index.ts</div>
       <div class="file-desc">TypeScript 类型定义。定义 Result、LoginVO、PageResult、Personnel、Project、Assignment、ConflictDetail、ConflictResult、CalendarEvent 等接口类型，与后端 DTO 对应。</div>
     </div>
+
+    <h3 id="frontend-utils">8.5 工具模块 (utils)</h3>
+    <div class="file-entry">
+      <div class="file-path"><span class="badge badge-frontend">Utils</span> utils/assignmentLog.ts</div>
+      <div class="file-desc">操作日志解析与展示工具。提供日志 JSON 解析、变更内容描述（含项目名上下文）、版本号提取、操作类型文案与标签类型等函数，供分配管理“历史”弹窗与操作日志页共用。日期字段支持毫秒时间戳自动转回 YYYY-MM-DD，变更对比按格式化后的值进行，兼容旧日志与现日志两种日期格式。</div>
+    </div>
   </section>
 
   <!-- === 9. API 接口汇总 === -->
@@ -1265,32 +1300,44 @@ flowchart TD
       <tbody>
         <tr><td>认证</td><td>POST</td><td>/auth/login</td><td>用户登录</td><td>公开</td></tr>
         <tr><td>认证</td><td>GET</td><td>/auth/info</td><td>获取当前用户</td><td>已认证</td></tr>
-        <tr><td>人员</td><td>GET</td><td>/personnel/page</td><td>分页查询</td><td>已认证</td></tr>
+        <tr><td>人员</td><td>GET</td><td>/personnel</td><td>分页查询（pageNum/pageSize/name/positions/deptId）</td><td>已认证</td></tr>
+        <tr><td>人员</td><td>GET</td><td>/personnel/list</td><td>查询全部（下拉选择用）</td><td>已认证</td></tr>
+        <tr><td>人员</td><td>GET</td><td>/personnel/{id}</td><td>详情</td><td>已认证</td></tr>
         <tr><td>人员</td><td>POST</td><td>/personnel</td><td>新增</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>人员</td><td>PUT</td><td>/personnel</td><td>修改</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>人员</td><td>DELETE</td><td>/personnel/{id}</td><td>删除</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>人员</td><td>POST</td><td>/personnel/import-excel</td><td>Excel 导入</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>人员</td><td>GET</td><td>/personnel/template</td><td>下载模板</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>项目</td><td>GET</td><td>/project/page</td><td>分页查询</td><td>已认证</td></tr>
+        <tr><td>人员</td><td>PUT</td><td>/personnel/{id}</td><td>修改</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>人员</td><td>DELETE</td><td>/personnel/{id}</td><td>删除（逻辑删除）</td><td>ADMIN</td></tr>
+        <tr><td>人员</td><td>POST</td><td>/personnel/batch</td><td>JSON 批量导入（工号查重）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>人员</td><td>POST</td><td>/personnel/import-excel</td><td>Excel 批量导入</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>人员</td><td>GET</td><td>/personnel/import-template</td><td>下载导入模板</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>项目</td><td>GET</td><td>/project</td><td>分页查询（pageNum/pageSize/name）</td><td>已认证</td></tr>
+        <tr><td>项目</td><td>GET</td><td>/project/list</td><td>查询全部（下拉选择用）</td><td>已认证</td></tr>
+        <tr><td>项目</td><td>GET</td><td>/project/{id}</td><td>详情</td><td>已认证</td></tr>
         <tr><td>项目</td><td>POST</td><td>/project</td><td>新增</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>项目</td><td>PUT</td><td>/project</td><td>修改</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>项目</td><td>DELETE</td><td>/project/{id}</td><td>删除</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>项目</td><td>POST</td><td>/project/import-excel</td><td>Excel 导入</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>项目</td><td>GET</td><td>/project/template</td><td>下载模板</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>分配</td><td>GET</td><td>/assignment/page</td><td>分页查询</td><td>已认证</td></tr>
-        <tr><td>分配</td><td>POST</td><td>/assignment</td><td>新增</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>分配</td><td>PUT</td><td>/assignment</td><td>修改</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>分配</td><td>DELETE</td><td>/assignment/{id}</td><td>删除</td><td>ADMIN, PROJECT_LEAD</td></tr>
-        <tr><td>冲突</td><td>GET</td><td>/conflict/all</td><td>全局冲突检测</td><td>已认证</td></tr>
+        <tr><td>项目</td><td>PUT</td><td>/project/{id}</td><td>修改</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>项目</td><td>DELETE</td><td>/project/{id}</td><td>删除（逻辑删除）</td><td>ADMIN</td></tr>
+        <tr><td>项目</td><td>POST</td><td>/project/batch</td><td>JSON 批量导入（项目名查重）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>项目</td><td>POST</td><td>/project/import-excel</td><td>Excel 批量导入</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>项目</td><td>GET</td><td>/project/import-template</td><td>下载导入模板</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>分配</td><td>GET</td><td>/assignment/page</td><td>分页查询（personnelId/projectId 筛选，含联表字段）</td><td>已认证</td></tr>
+        <tr><td>分配</td><td>GET</td><td>/assignment</td><td>全量查询（日历、报表用）</td><td>已认证</td></tr>
+        <tr><td>分配</td><td>POST</td><td>/assignment</td><td>新增（版本号=1，写操作日志）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>分配</td><td>PUT</td><td>/assignment/{id}</td><td>修改（版本号+1，写操作日志）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>分配</td><td>DELETE</td><td>/assignment/{id}</td><td>删除（逻辑删除，写操作日志）</td><td>ADMIN</td></tr>
+        <tr><td>分配</td><td>GET</td><td>/assignment/{id}/logs</td><td>单条分配调整历史（操作日志倒序）</td><td>已认证</td></tr>
+        <tr><td>冲突</td><td>GET</td><td>/conflict/detect</td><td>全局冲突检测（deptId 可选）</td><td>已认证</td></tr>
         <tr><td>冲突</td><td>GET</td><td>/conflict/personnel/{id}</td><td>按人员检测</td><td>已认证</td></tr>
-        <tr><td>冲突</td><td>GET</td><td>/conflict/calendar</td><td>日历数据</td><td>已认证</td></tr>
-        <tr><td>冲突</td><td>GET</td><td>/conflict/suggestions</td><td>调优建议</td><td>已认证</td></tr>
+        <tr><td>冲突</td><td>GET</td><td>/conflict/calendar</td><td>日历数据（personnelId/projectId/deptId/时间区间）</td><td>已认证</td></tr>
+        <tr><td>冲突</td><td>GET</td><td>/conflict/suggestions</td><td>调优建议（deptId 可选）</td><td>已认证</td></tr>
         <tr><td>部门</td><td>GET</td><td>/department/tree</td><td>部门树</td><td>已认证</td></tr>
+        <tr><td>部门</td><td>GET</td><td>/department</td><td>部门扁平列表</td><td>已认证</td></tr>
         <tr><td>部门</td><td>POST</td><td>/department</td><td>新增</td><td>ADMIN</td></tr>
-        <tr><td>部门</td><td>PUT</td><td>/department</td><td>修改</td><td>ADMIN</td></tr>
+        <tr><td>部门</td><td>PUT</td><td>/department/{id}</td><td>修改</td><td>ADMIN</td></tr>
         <tr><td>部门</td><td>DELETE</td><td>/department/{id}</td><td>删除</td><td>ADMIN</td></tr>
-        <tr><td>报表</td><td>GET</td><td>/report/data</td><td>报表数据</td><td>已认证</td></tr>
-        <tr><td>报表</td><td>GET</td><td>/report/pdf</td><td>PDF 导出</td><td>已认证</td></tr>
+        <tr><td>报表</td><td>GET</td><td>/report/export/assignment</td><td>人员时间分配表（format=xlsx/pdf）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>报表</td><td>GET</td><td>/report/export/conflict</td><td>项目人员冲突报表（format=xlsx/pdf）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>报表</td><td>GET</td><td>/report/export/utilization</td><td>人员利用率统计（format=xlsx/pdf）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>操作日志</td><td>GET</td><td>/operation-log/page</td><td>分页查询（operator/action/personnelId 筛选）</td><td>ADMIN, PROJECT_LEAD</td></tr>
+        <tr><td>操作日志</td><td>GET</td><td>/operation-log/export</td><td>导出（format=xlsx/pdf，筛选同分页）</td><td>ADMIN, PROJECT_LEAD</td></tr>
       </tbody>
     </table>
   </section>
@@ -1314,14 +1361,15 @@ flowchart TD
         <tr><td>部门管理</td><td class="perm-yes">✓</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
         <tr><td>冲突清单</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td></tr>
         <tr><td>日历视图</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td></tr>
-        <tr><td>报表导出</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td></tr>
+        <tr><td>报表导出</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td><td class="perm-no">—</td></tr>
+        <tr><td>操作日志（查看/导出）</td><td class="perm-yes">✓</td><td class="perm-yes">✓</td><td class="perm-no">—</td></tr>
       </tbody>
     </table>
 
     <h3>10.2 认证流程</h3>
     <ol style="padding-left: 1.2rem; font-size: 0.9rem;">
       <li>用户通过 <code>/auth/login</code> 提交用户名和密码</li>
-      <li>后端验证密码（MD5 比对），生成 JWT Token（携带 userId、username、role）</li>
+      <li>后端验证密码（MD5 比对），生成 JWT Token（携带 userId、username、role、realName）</li>
       <li>前端存储 Token 到 localStorage 和 Pinia Store</li>
       <li>后续请求通过 Axios 请求拦截器自动添加 <code>Authorization: Bearer {token}</code> 头</li>
       <li>JwtInterceptor 拦截所有请求，验证 Token 有效性并解析用户信息</li>
@@ -1331,11 +1379,11 @@ flowchart TD
     <h3>10.3 数据安全措施</h3>
     <div class="card">
       <div class="card-title">AES 对称加密</div>
-      <p><code>DataEncryptUtils</code> 提供 AES 加解密能力，密钥从 <code>application.yml</code> 读取。敏感业务数据可加密存储，解密失败时兼容返回原文（处理历史未加密数据）。</p>
+      <p><code>DataEncryptUtils</code> 提供 AES 加解密能力，密钥从 <code>application.yml</code> 读取。人员工号、项目名称保存时加密、读取时自动解密（getById / list / listByIds / 分页均覆盖），接口返回前解密避免密文外泄；批量导入查重兼容历史明文与早期双重加密数据；解密失败时兼容返回原文（处理历史未加密数据）。</p>
     </div>
     <div class="card">
       <div class="card-title">操作日志审计</div>
-      <p>所有增删改操作记录到 <code>operation_log</code> 表，含旧值/新值 JSON 快照。<code>LogRetentionTask</code> 定时任务每月归档超过 24 个月的日志，满足留存要求。</p>
+      <p>分配的增删改操作记录到 <code>operation_log</code> 表，含旧值/新值 JSON 快照（日期以 ISO 字符串存储，避免毫秒时间戳难以阅读）。操作人由后端从登录令牌解析（真实姓名优先，其次用户名）。前端提供单条分配“历史”弹窗与全局“操作日志”页面（支持按人员/操作类型/操作人筛选和 Excel/PDF 导出）。<code>LogRetentionTask</code> 定时任务每月归档超过 24 个月的日志，满足留存要求。</p>
     </div>
     <div class="card">
       <div class="card-title">逻辑删除</div>

@@ -230,14 +230,12 @@ import { updateAssignment } from '@/api/assignment'
 import { exportReport } from '@/api/report'
 import { getDepartmentTree, flattenDepartments, type DepartmentVO } from '@/api/department'
 import { getPersonnelAll } from '@/api/personnel'
-import { useUserStore } from '@/stores/user'
 import type { ConflictResult, Personnel } from '@/types'
 import type { ConflictSuggestion, ReplacementCandidate } from '@/api/conflict'
 
 type TagType = '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
 
 const router = useRouter()
-const userStore = useUserStore()
 const loading = ref(false)
 const conflictList = ref<ConflictResult[]>([])
 
@@ -329,12 +327,6 @@ function isReplacing(assignmentId: number, candidateId: number): boolean {
   return !!replacingKeys[`${assignmentId}-${candidateId}`]
 }
 
-// 当前操作人（用于后端记录操作日志）
-function currentOperator(): string {
-  const info = userStore.userInfo as { realName?: string; username?: string } | null
-  return info?.realName || info?.username || 'unknown'
-}
-
 // 二次确认替换人员：不推荐档位多一道风险提示
 async function confirmReplace(sug: ConflictSuggestion, candidate: ReplacementCandidate) {
   const isNotRecommended =
@@ -361,16 +353,15 @@ async function confirmReplace(sug: ConflictSuggestion, candidate: ReplacementCan
   await doReplace(sug, candidate)
 }
 
-// 执行替换：仅更新 personnelId 与 operator，其余字段由后端保留原值
+// 执行替换：仅更新 personnelId，其余字段由后端保留原值；操作人由后端从登录令牌解析
 async function doReplace(sug: ConflictSuggestion, candidate: ReplacementCandidate) {
   const key = `${sug.conflictAssignmentId}-${candidate.personnelId}`
   replacingKeys[key] = true
   try {
     await updateAssignment(sug.conflictAssignmentId, {
-      personnelId: candidate.personnelId,
-      operator: currentOperator()
+      personnelId: candidate.personnelId
     })
-    ElMessage.success(`已替换为 ${candidate.name}（${candidate.empNo}）`)
+    ElMessage.success(`已替换为 ${candidate.name}（${candidate.empNo}），可在「分配管理-历史」查看调整记录`)
 
     // 替换成功后重新检测冲突并刷新建议面板
     expanded[sug.personnelId] = false

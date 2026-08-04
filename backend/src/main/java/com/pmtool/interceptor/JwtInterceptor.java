@@ -63,6 +63,7 @@ public class JwtInterceptor implements HandlerInterceptor {
             // 将用户信息存入 request 属性，供 Controller 使用
             request.setAttribute("userId", Long.parseLong(claims.getSubject()));
             request.setAttribute("username", claims.get("username", String.class));
+            request.setAttribute("realName", claims.get("realName", String.class));
             request.setAttribute("role", role);
 
             // ========== 角色权限校验（授权） ==========

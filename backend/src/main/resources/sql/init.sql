@@ -57,7 +57,9 @@ CREATE TABLE project (
   start_date DATE NOT NULL COMMENT '项目开始日期',
   end_date DATE NOT NULL COMMENT '项目结束日期',
   priority INT DEFAULT 3 COMMENT '优先级 1-5, 5最高',
+  required_position VARCHAR(200) COMMENT '所需人员岗位（逗号分隔）',
   daily_hours DECIMAL(5,1) DEFAULT 8.0 COMMENT '每日所需工时',
+  weekly_hours DECIMAL(5,1) DEFAULT 40.0 COMMENT '每周所需工时',
   deleted TINYINT DEFAULT 0,
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -133,31 +135,47 @@ INSERT INTO personnel (emp_no, name, positions, skills, dept_id, available_start
 ('EMP004', '赵敏', 'DBA,运维工程师', 'MySQL,Redis,Linux,Python,Shell', 3, '2026-01-01', '2026-12-31'),
 ('EMP005', '刘洋', '运维工程师', 'Linux,Docker,Kubernetes,Shell,Python', 4, '2026-01-01', '2026-12-31');
 
--- 项目数据（5个项目，优先级不同）
-INSERT INTO project (name, start_date, end_date, priority, daily_hours) VALUES
-('电商平台升级', '2026-02-01', '2026-06-30', 5, 8.0),
-('数据中心迁移', '2026-03-01', '2026-07-31', 4, 8.0),
-('安全审计加固', '2026-04-01', '2026-08-31', 3, 6.0),
-('CI/CD流水线建设', '2026-05-01', '2026-09-30', 4, 8.0),
-('数据库性能优化', '2026-03-15', '2026-07-15', 2, 6.0);
+-- 项目数据（5个项目，优先级不同，含所需岗位和每周工时）
+INSERT INTO project (name, start_date, end_date, priority, required_position, daily_hours, weekly_hours) VALUES
+('电商平台升级', '2026-02-01', '2026-06-30', 5, '运维工程师,DBA', 8.0, 40.0),
+('数据中心迁移', '2026-03-01', '2026-07-31', 4, '运维工程师', 8.0, 40.0),
+('安全审计加固', '2026-04-01', '2026-08-31', 3, '运维工程师,DBA', 6.0, 30.0),
+('CI/CD流水线建设', '2026-05-01', '2026-09-30', 4, '运维工程师', 8.0, 40.0),
+('数据库性能优化', '2026-03-15', '2026-07-15', 2, 'DBA', 6.0, 30.0);
 
 -- 人员项目分配数据（包含刻意制造的冲突）
 -- 张伟(EMP001): 同时在电商平台升级和数据中心迁移，时间重叠 → 冲突
-INSERT INTO assignment (personnel_id, project_id, start_date, end_date, daily_hours, version, operator) VALUES
-(1, 1, '2026-02-01', '2026-06-30', 8.0, 1, 'admin'),   -- 张伟 → 电商平台升级
-(1, 2, '2026-03-01', '2026-07-31', 8.0, 1, 'admin'),   -- 张伟 → 数据中心迁移（与上面重叠 3/1~6/30）
+-- create_time/update_time 显式指定，便于操作日志中的 JSON 快照与之保持一致
+INSERT INTO assignment (personnel_id, project_id, start_date, end_date, daily_hours, version, operator, create_time, update_time) VALUES
+(1, 1, '2026-02-01', '2026-06-30', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 张伟 → 电商平台升级
+(1, 2, '2026-03-01', '2026-07-31', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 张伟 → 数据中心迁移（与上面重叠 3/1~6/30）
 
 -- 李娜(EMP002): 同时在电商平台升级和安全审计加固，时间重叠 → 冲突
-(2, 1, '2026-02-15', '2026-06-15', 8.0, 1, 'admin'),   -- 李娜 → 电商平台升级
-(2, 3, '2026-04-01', '2026-08-31', 6.0, 1, 'admin'),   -- 李娜 → 安全审计加固（与上面重叠 4/1~6/15）
+(2, 1, '2026-02-15', '2026-06-15', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 李娜 → 电商平台升级
+(2, 3, '2026-04-01', '2026-08-31', 6.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 李娜 → 安全审计加固（与上面重叠 4/1~6/15）
 
 -- 王强(EMP003): 同时在数据中心迁移和CI/CD建设，时间重叠 → 冲突
-(3, 2, '2026-03-01', '2026-07-31', 8.0, 1, 'admin'),   -- 王强 → 数据中心迁移
-(3, 4, '2026-05-01', '2026-09-30', 8.0, 1, 'admin'),   -- 王强 → CI/CD建设（与上面重叠 5/1~7/31）
+(3, 2, '2026-03-01', '2026-07-31', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 王强 → 数据中心迁移
+(3, 4, '2026-05-01', '2026-09-30', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 王强 → CI/CD建设（与上面重叠 5/1~7/31）
 
 -- 赵敏(EMP004): 同时在数据库性能优化和安全审计加固，时间重叠 → 冲突
-(4, 5, '2026-03-15', '2026-07-15', 6.0, 1, 'admin'),   -- 赵敏 → 数据库性能优化
-(4, 3, '2026-04-15', '2026-08-31', 4.0, 1, 'admin'),   -- 赵敏 → 安全审计加固（与上面重叠 4/15~7/15）
+(4, 5, '2026-03-15', '2026-07-15', 6.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 赵敏 → 数据库性能优化
+(4, 3, '2026-04-15', '2026-08-31', 4.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00'),   -- 赵敏 → 安全审计加固（与上面重叠 4/15~7/15）
 
 -- 刘洋(EMP005): 只分配一个项目，无冲突（可用于测试调优建议中的替代候选人）
-(5, 4, '2026-06-01', '2026-09-30', 8.0, 1, 'admin');   -- 刘洋 → CI/CD建设（无冲突）
+(5, 4, '2026-06-01', '2026-09-30', 8.0, 1, 'admin', '2026-01-15 10:00:00', '2026-01-15 10:00:00');   -- 刘洋 → CI/CD建设（无冲突）
+
+-- ============================================================
+-- 操作日志：与 9 条分配一一对应的“新增”记录
+-- 使初始化后的数据在网页上可直接追溯（分配管理-历史、操作日志页）
+-- ============================================================
+INSERT INTO operation_log (entity_type, entity_id, action, old_value, new_value, operator, operate_time) VALUES
+('ASSIGNMENT', 1, 'CREATE', NULL, '{"id":1,"personnelId":1,"projectId":1,"startDate":"2026-02-01","endDate":"2026-06-30","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 2, 'CREATE', NULL, '{"id":2,"personnelId":1,"projectId":2,"startDate":"2026-03-01","endDate":"2026-07-31","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 3, 'CREATE', NULL, '{"id":3,"personnelId":2,"projectId":1,"startDate":"2026-02-15","endDate":"2026-06-15","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 4, 'CREATE', NULL, '{"id":4,"personnelId":2,"projectId":3,"startDate":"2026-04-01","endDate":"2026-08-31","dailyHours":6.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 5, 'CREATE', NULL, '{"id":5,"personnelId":3,"projectId":2,"startDate":"2026-03-01","endDate":"2026-07-31","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 6, 'CREATE', NULL, '{"id":6,"personnelId":3,"projectId":4,"startDate":"2026-05-01","endDate":"2026-09-30","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 7, 'CREATE', NULL, '{"id":7,"personnelId":4,"projectId":5,"startDate":"2026-03-15","endDate":"2026-07-15","dailyHours":6.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 8, 'CREATE', NULL, '{"id":8,"personnelId":4,"projectId":3,"startDate":"2026-04-15","endDate":"2026-08-31","dailyHours":4.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00'),
+('ASSIGNMENT', 9, 'CREATE', NULL, '{"id":9,"personnelId":5,"projectId":4,"startDate":"2026-06-01","endDate":"2026-09-30","dailyHours":8.0,"version":1,"operator":"admin","deleted":0,"createTime":"2026-01-15T10:00:00","updateTime":"2026-01-15T10:00:00"}', 'admin', '2026-01-15 10:00:00');

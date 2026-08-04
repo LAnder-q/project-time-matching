@@ -37,7 +37,17 @@
             <el-rate :model-value="row.priority" disabled />
           </template>
         </el-table-column>
+        <el-table-column prop="requiredPosition" label="所需岗位" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.requiredPosition || '—' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="dailyHours" label="每日工时" width="100" align="center" />
+        <el-table-column prop="weeklyHours" label="每周工时" width="100" align="center">
+          <template #default="{ row }">
+            {{ row.weeklyHours || '—' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
@@ -92,8 +102,14 @@
             <el-option v-for="n in 5" :key="n" :label="`${n} 星`" :value="n" />
           </el-select>
         </el-form-item>
+        <el-form-item label="所需岗位" prop="requiredPosition">
+          <el-input v-model="form.requiredPosition" placeholder="多个岗位用逗号分隔，如：运维工程师,DBA" />
+        </el-form-item>
         <el-form-item label="每日工时" prop="dailyHours">
           <el-input-number v-model="form.dailyHours" :min="1" :max="24" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="每周工时" prop="weeklyHours">
+          <el-input-number v-model="form.weeklyHours" :min="1" :max="168" style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -143,13 +159,13 @@
             :closable="false"
             style="margin-bottom: 16px"
           >
-            每行一个项目，字段顺序：项目名称, 开始日期, 结束日期, 优先级, 每日工时。日期格式 YYYY-MM-DD。项目名已存在则更新。
+            每行一个项目，字段顺序：项目名称, 开始日期, 结束日期, 优先级, 所需岗位, 每日工时, 每周工时。日期格式 YYYY-MM-DD。项目名已存在则更新。
           </el-alert>
           <el-input
             v-model="importText"
             type="textarea"
             :rows="10"
-            placeholder="示例:&#10;项目A,2024-01-01,2024-06-30,5,8&#10;项目B,2024-03-01,2024-09-30,3,6"
+            placeholder="示例:&#10;项目A,2024-01-01,2024-06-30,5,运维工程师,8,40&#10;项目B,2024-03-01,2024-09-30,3,DBA,6,30"
           />
           <template #footer>
             <el-button @click="importDialogVisible = false">取消</el-button>
@@ -193,7 +209,9 @@ const defaultForm = (): Project => ({
   startDate: '',
   endDate: '',
   priority: 3,
-  dailyHours: 8
+  requiredPosition: '',
+  dailyHours: 8,
+  weeklyHours: 40
 })
 
 const form = reactive<Project>(defaultForm())
@@ -347,7 +365,9 @@ async function handleImportSubmit() {
       startDate: parts[1],
       endDate: parts[2],
       priority: parseInt(parts[3]) || 3,
-      dailyHours: parseFloat(parts[4]) || 8
+      requiredPosition: parts[4] || '',
+      dailyHours: parts[5] ? parseFloat(parts[5]) : 8,
+      weeklyHours: parts[6] ? parseFloat(parts[6]) : 40
     })
   }
   importing.value = true

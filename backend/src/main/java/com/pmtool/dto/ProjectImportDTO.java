@@ -9,7 +9,7 @@ import java.math.BigDecimal;
  * 项目 Excel 导入 DTO
  * 用于 EasyExcel 解析上传的 Excel 文件
  *
- * 列顺序：项目名称 | 开始日期 | 结束日期 | 优先级 | 每日工时
+ * 列顺序：项目名称 | 开始日期 | 结束日期 | 优先级 | 所需岗位 | 每日工时 | 每周工时
  */
 @Data
 public class ProjectImportDTO {
@@ -26,6 +26,12 @@ public class ProjectImportDTO {
     @ExcelProperty(value = "优先级", index = 3)
     private Integer priority;
 
-    @ExcelProperty(value = "每日工时", index = 4)
+    @ExcelProperty(value = "所需岗位", index = 4)
+    private String requiredPosition;
+
+    @ExcelProperty(value = "每日工时", index = 5)
     private BigDecimal dailyHours;
+
+    @ExcelProperty(value = "每周工时", index = 6)
+    private BigDecimal weeklyHours;
 }

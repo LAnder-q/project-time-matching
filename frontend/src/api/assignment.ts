@@ -11,6 +11,18 @@ export interface AssignmentPageQuery extends AssignmentQuery {
   pageSize: number
 }
 
+// 操作日志（分配调整历史）
+export interface OperationLog {
+  id: number
+  entityType: string
+  entityId: number
+  action: string
+  oldValue?: string | null
+  newValue?: string | null
+  operator?: string
+  operateTime: string
+}
+
 /**
  * 分页查询分配记录
  */
@@ -36,4 +48,11 @@ export function updateAssignment(id: number, data: Partial<Assignment>): Promise
 
 export function deleteAssignment(id: number): Promise<void> {
   return http.delete<void>(`/assignment/${id}`)
+}
+
+/**
+ * 查询指定分配的调整历史（操作日志，按时间倒序）
+ */
+export function getAssignmentLogs(id: number): Promise<OperationLog[]> {
+  return http.get<OperationLog[]>(`/assignment/${id}/logs`)
 }

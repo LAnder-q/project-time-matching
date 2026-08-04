@@ -5,6 +5,7 @@ import com.pmtool.common.PageResult;
 import com.pmtool.dto.AssignmentDTO;
 import com.pmtool.dto.AssignmentVO;
 import com.pmtool.entity.Assignment;
+import com.pmtool.entity.OperationLog;
 
 import java.util.List;
 
@@ -49,4 +50,20 @@ public interface AssignmentService extends IService<Assignment> {
      * @return 更新后的分配
      */
     Assignment updateAssignment(Long id, AssignmentDTO dto);
+
+    /**
+     * 删除分配（逻辑删除，同时记录操作日志实现历史追溯）
+     *
+     * @param id       分配ID
+     * @param operator 操作人
+     */
+    void deleteAssignment(Long id, String operator);
+
+    /**
+     * 查询指定分配的调整历史（操作日志，按操作时间倒序）
+     *
+     * @param assignmentId 分配ID
+     * @return 操作日志列表
+     */
+    List<OperationLog> listLogs(Long assignmentId);
 }

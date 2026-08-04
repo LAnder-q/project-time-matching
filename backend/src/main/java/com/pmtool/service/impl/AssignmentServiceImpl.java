@@ -1,6 +1,5 @@
 package com.pmtool.service.impl;
 
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -16,6 +15,8 @@ import com.pmtool.mapper.OperationLogMapper;
 import com.pmtool.service.AssignmentService;
 import com.pmtool.service.PersonnelService;
 import com.pmtool.service.ProjectService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,13 +37,16 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
     private final OperationLogMapper operationLogMapper;
     private final PersonnelService personnelService;
     private final ProjectService projectService;
+    private final ObjectMapper objectMapper;
 
     public AssignmentServiceImpl(OperationLogMapper operationLogMapper,
                                  PersonnelService personnelService,
-                                 ProjectService projectService) {
+                                 ProjectService projectService,
+                                 ObjectMapper objectMapper) {
         this.operationLogMapper = operationLogMapper;
         this.personnelService = personnelService;
         this.projectService = projectService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -118,9 +122,11 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
         BeanUtils.copyProperties(dto, assignment);
         assignment.setVersion(1);
         this.save(assignment);
+        // 回读保存后的完整记录（含数据库填充的 createTime/updateTime），保证日志快照完整
+        Assignment saved = this.getById(assignment.getId());
         // 记录操作日志
-        logOperation(null, assignment, "CREATE", dto.getOperator());
-        return assignment;
+        logOperation(null, saved, "CREATE", dto.getOperator());
+        return saved;
     }
 
     @Override
@@ -148,6 +154,36 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
         return updated;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAssignment(Long id, String operator) {
+        Assignment old = this.getById(id);
+        if (old == null) {
+            throw new RuntimeException("分配记录不存在: " + id);
+        }
+        // 逻辑删除
+        this.removeById(id);
+
+        // 记录删除日志（保留删除前的完整快照）
+        OperationLog log = new OperationLog();
+        log.setEntityType("ASSIGNMENT");
+        log.setEntityId(id);
+        log.setAction("DELETE");
+        log.setOldValue(toJson(old));
+        log.setNewValue(null);
+        log.setOperator(operator);
+        operationLogMapper.insert(log);
+    }
+
+    @Override
+    public List<OperationLog> listLogs(Long assignmentId) {
+        LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OperationLog::getEntityType, "ASSIGNMENT");
+        wrapper.eq(OperationLog::getEntityId, assignmentId);
+        wrapper.orderByDesc(OperationLog::getOperateTime);
+        return operationLogMapper.selectList(wrapper);
+    }
+
     /**
      * 记录操作日志
      *
@@ -161,9 +197,25 @@ public class AssignmentServiceImpl extends ServiceImpl<AssignmentMapper, Assignm
         log.setEntityType("ASSIGNMENT");
         log.setEntityId(newValue.getId());
         log.setAction(action);
-        log.setOldValue(oldValue != null ? JSONUtil.toJsonStr(oldValue) : null);
-        log.setNewValue(JSONUtil.toJsonStr(newValue));
+        log.setOldValue(toJson(oldValue));
+        log.setNewValue(toJson(newValue));
         log.setOperator(operator);
         operationLogMapper.insert(log);
+    }
+
+    /**
+     * 将分配快照序列化为 JSON。
+     * 使用 Spring 的 ObjectMapper（日期输出为 ISO 字符串，如 2026-09-30），
+     * 避免 Hutool 默认将日期序列化为毫秒时间戳导致历史记录难以阅读。
+     */
+    private String toJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("操作日志序列化失败", e);
+        }
     }
 }

@@ -187,6 +187,7 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import dayjs from 'dayjs'
 import type {
   CalendarOptions,
   CalendarApi,
@@ -261,7 +262,9 @@ function buildEventInputs(data: CalendarEvent[]): EventInput[] {
       id: e.id,
       title: `${e.projectName}${hasConflict ? ' [冲突]' : ''}`,
       start: e.start,
-      end: e.end,
+      // FullCalendar 的 all-day 事件结束日期为开区间（不包含 end 当天），
+      // 显示时 +1 天，保证分配的最后一个自然日正常展示；详情弹窗仍显示原始结束日期
+      end: dayjs(e.end).add(1, 'day').format('YYYY-MM-DD'),
       backgroundColor: hasConflict ? '#f56c6c' : color,
       borderColor: hasConflict ? '#f56c6c' : color
     }

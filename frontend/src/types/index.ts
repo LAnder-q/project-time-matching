@@ -43,7 +43,9 @@ export interface Project {
   startDate: string
   endDate: string
   priority: number
+  requiredPosition?: string
   dailyHours: number
+  weeklyHours?: number
 }
 
 // 分配

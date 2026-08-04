@@ -143,7 +143,9 @@ public class ProjectController {
                 p.setEndDate(LocalDate.parse(dto.getEndDate().trim()));
             }
             p.setPriority(dto.getPriority() != null ? dto.getPriority() : 3);
+            p.setRequiredPosition(dto.getRequiredPosition() != null ? dto.getRequiredPosition().trim() : null);
             p.setDailyHours(dto.getDailyHours() != null ? dto.getDailyHours() : new BigDecimal("8.0"));
+            p.setWeeklyHours(dto.getWeeklyHours() != null ? dto.getWeeklyHours() : new BigDecimal("40.0"));
 
             projectList.add(p);
         }
@@ -174,7 +176,9 @@ public class ProjectController {
             setStartDate("2026-02-01");
             setEndDate("2026-06-30");
             setPriority(5);
+            setRequiredPosition("运维工程师,DBA");
             setDailyHours(new BigDecimal("8.0"));
+            setWeeklyHours(new BigDecimal("40.0"));
         }});
 
         EasyExcel.write(response.getOutputStream())

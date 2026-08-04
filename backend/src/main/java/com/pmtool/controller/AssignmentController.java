@@ -6,7 +6,9 @@ import com.pmtool.common.Result;
 import com.pmtool.dto.AssignmentDTO;
 import com.pmtool.dto.AssignmentVO;
 import com.pmtool.entity.Assignment;
+import com.pmtool.entity.OperationLog;
 import com.pmtool.service.AssignmentService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,7 +56,8 @@ public class AssignmentController {
      */
     @PostMapping
     @RequireRole({"ADMIN", "PROJECT_LEAD"})
-    public Result<Assignment> create(@RequestBody AssignmentDTO dto) {
+    public Result<Assignment> create(@RequestBody AssignmentDTO dto, HttpServletRequest request) {
+        dto.setOperator(resolveOperator(request, dto.getOperator()));
         return Result.ok(assignmentService.createAssignment(dto));
     }
 
@@ -63,17 +66,42 @@ public class AssignmentController {
      */
     @PutMapping("/{id}")
     @RequireRole({"ADMIN", "PROJECT_LEAD"})
-    public Result<Assignment> update(@PathVariable Long id, @RequestBody AssignmentDTO dto) {
+    public Result<Assignment> update(@PathVariable Long id, @RequestBody AssignmentDTO dto, HttpServletRequest request) {
+        dto.setOperator(resolveOperator(request, dto.getOperator()));
         return Result.ok(assignmentService.updateAssignment(id, dto));
     }
 
     /**
-     * 删除分配（逻辑删除，仅管理员）
+     * 删除分配（逻辑删除并记录操作日志，仅管理员）
      */
     @DeleteMapping("/{id}")
     @RequireRole({"ADMIN"})
-    public Result<Void> delete(@PathVariable Long id) {
-        assignmentService.removeById(id);
+    public Result<Void> delete(@PathVariable Long id, HttpServletRequest request) {
+        assignmentService.deleteAssignment(id, resolveOperator(request, null));
         return Result.ok(null);
+    }
+
+    /**
+     * 查询指定分配的调整历史（操作日志，倒序）
+     */
+    @GetMapping("/{id}/logs")
+    @RequireRole({"ADMIN", "PROJECT_LEAD", "USER"})
+    public Result<List<OperationLog>> logs(@PathVariable Long id) {
+        return Result.ok(assignmentService.listLogs(id));
+    }
+
+    /**
+     * 解析操作人：优先取登录令牌中的真实姓名，其次为用户名，最后回退到前端传值
+     */
+    private String resolveOperator(HttpServletRequest request, String fallback) {
+        Object realName = request.getAttribute("realName");
+        if (realName != null && !realName.toString().trim().isEmpty()) {
+            return realName.toString().trim();
+        }
+        Object username = request.getAttribute("username");
+        if (username != null && !username.toString().trim().isEmpty()) {
+            return username.toString().trim();
+        }
+        return fallback;
     }
 }

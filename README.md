@@ -30,13 +30,14 @@
 ## 功能特性
 
 - **人员管理** — 增删改查、按姓名/工号/岗位搜索、Excel 批量导入（工号查重）
-- **项目管理** — 增删改查、按项目名搜索、优先级设置（1-5 星）、Excel 批量导入（项目名查重）
+- **项目管理** — 增删改查、按项目名搜索、优先级设置（1-5 星）、所需岗位/每周工时配置、Excel 批量导入（项目名查重）
 - **分配管理** — 人员与项目时间分配、双重筛选、版本号追溯、操作日志审计
 - **冲突检测** — 自动检测时间区间重叠、三级严重程度分级（HIGH / MEDIUM / LOW）
-- **智能替换推荐** — Jaccard 技能匹配 + 项目周期可用率计算、三档推荐分级
+- **智能替换推荐** — 岗位/技能匹配（Jaccard 相似度）+ 项目周期可用率计算、三档推荐分级
 - **日历可视化** — FullCalendar 日/周/月视图、人员/项目/时间区间三维度筛选、冲突红色高亮
 - **报表导出** — 三种报表 × 两种格式（Excel + PDF）、中文 PDF 支持
 - **权限控制** — JWT 认证、三级角色（ADMIN / PROJECT_LEAD / USER）、菜单按角色过滤
+- **数据安全** — 人员工号、项目名称 AES 对称加密存储，读取自动解密；操作日志自动归档留存 24 个月
 - **设计体系** — Indigo Workspace 设计系统、CSS 变量驱动、响应式布局
 
 ## 系统架构
@@ -109,12 +110,14 @@ project-time-matching/
 │       │   │   ├── Project.java             #   项目
 │       │   │   ├── Assignment.java          #   分配
 │       │   │   └── OperationLog.java        #   操作日志
-│       │   ├── dto/                         # 数据传输对象 (8个)
+│       │   ├── dto/                         # 数据传输对象 (10个)
 │       │   │   ├── LoginDTO / LoginVO       #   登录请求/响应
 │       │   │   ├── AssignmentDTO / VO       #   分配请求/响应
 │       │   │   ├── ConflictResult / Detail  #   冲突检测结果
 │       │   │   ├── ConflictSuggestion       #   调优建议(含候选人)
-│       │   │   └── CalendarEvent            #   日历事件
+│       │   │   ├── CalendarEvent            #   日历事件
+│       │   │   ├── PersonnelImportDTO       #   人员Excel导入
+│       │   │   └── ProjectImportDTO         #   项目Excel导入
 │       │   ├── mapper/                      # MyBatis-Plus Mapper (5个)
 │       │   ├── interceptor/
 │       │   │   └── JwtInterceptor.java      #   JWT 认证拦截器
@@ -219,6 +222,7 @@ CREATE DATABASE IF NOT EXISTS pm_tool DEFAULT CHARACTER SET utf8mb4 COLLATE utf8
 | 人员 | 5 | 运维工程师、DBA 等 |
 | 项目 | 5 | 不同优先级和周期 |
 | 分配记录 | 9 | 含刻意制造的冲突场景 |
+| 操作日志 | 9 | 与 9 条分配一一对应的“新增”记录，初始化后即可追溯 |
 
 ### 2. 启动后端
 
@@ -254,7 +258,7 @@ npm run dev
 
 ### 项目管理
 
-项目信息的增删改查、按项目名搜索、优先级设置（1-5 星）。支持 Excel 批量导入：前端解析 Excel 文件后以 JSON 数组提交至 `/project/batch` 接口，后端按项目名查重，已存在则更新，不存在则新增。
+项目信息的增删改查、按项目名搜索、优先级设置（1-5 星）、所需岗位与每日/每周工时配置。支持 Excel 批量导入：前端解析 Excel 文件后以 JSON 数组提交至 `/project/batch` 接口，后端按项目名查重，已存在则更新，不存在则新增。
 
 ### 分配管理
 
@@ -274,7 +278,7 @@ npm run dev
 
 当检测到冲突后，对低优先级项目自动推荐替代人员，基于两个维度评分：
 
-- **技能匹配度**：取冲突人员技能与项目所需岗位的并集，计算 Jaccard 相似度
+- **岗位/技能匹配度**：优先使用项目的 `requiredPosition`（所需岗位）与候选人员的 `positions` 计算 Jaccard 相似度；若项目未设置所需岗位则回退到冲突人员技能匹配
 - **可用率**：基于低优先级项目完整周期计算空闲天数占比
 
 三档推荐分级：
@@ -325,7 +329,7 @@ npm run dev
 |------|------|----------|
 | `sys_user` | 系统用户表 | id, username, password, role, real_name |
 | `personnel` | 人员表 | id, emp_no, name, position, skills, available_start/end_date |
-| `project` | 项目表 | id, name, start/end_date, priority, required_position, daily_hours |
+| `project` | 项目表 | id, name, start/end_date, priority, required_position, daily_hours, weekly_hours |
 | `assignment` | 分配表 | id, personnel_id, project_id, start/end_date, daily_hours, version |
 | `operation_log` | 操作日志表 | id, entity_type, entity_id, action, old_value, new_value, operator |
 
@@ -344,6 +348,8 @@ personnel (1) ──< assignment >── (1) project
 - `assignment` 表包含 `version` 字段，每次更新自增，配合 `operation_log` 实现版本追溯
 - 所有业务表使用 `deleted` 字段（0=未删除, 1=已删除）实现逻辑删除
 - 密码使用 MD5 加密存储
+- 敏感业务字段（人员工号、项目名称）使用 AES 对称加密存储（`DataEncryptUtils`），
+  加密密钥在 `application.yml` 的 `data.encrypt.key` 配置；解密失败时兼容返回原文，支持历史明文数据平滑迁移
 
 ## API 接口文档
 
@@ -529,7 +535,7 @@ server {
 
 ### Q: 批量导入失败？
 
-批量导入接口接收 JSON 数组格式（非文件流）。前端负责解析 Excel 文件并转换为 JSON 后提交。确认 Excel 表头与字段名匹配，且数据格式正确。
+批量导入支持 Excel 文件上传和文本批量导入两种方式。Excel 导入通过后端 EasyExcel 解析；文本导入由前端解析为 JSON 数组后提交至 `/batch` 接口。确认 Excel 表头与模板一致（项目导入含：项目名称、开始日期、结束日期、优先级、所需岗位、每日工时、每周工时），且数据格式正确。
 
 ## 开发指南
 

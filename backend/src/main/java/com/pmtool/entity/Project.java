@@ -32,8 +32,14 @@ public class Project {
     /** 优先级 1-5, 5最高 */
     private Integer priority;
 
+    /** 所需人员岗位（逗号分隔，如：运维工程师,DBA） */
+    private String requiredPosition;
+
     /** 每日所需工时 */
     private BigDecimal dailyHours;
+
+    /** 每周所需工时 */
+    private BigDecimal weeklyHours;
 
     /** 逻辑删除标志 */
     @TableLogic

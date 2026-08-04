@@ -80,11 +80,14 @@ public class ReportController {
 
             // 统计该分配的操作记录
             List<OperationLog> logs = logByEntityId.getOrDefault(a.getId(), Collections.emptyList());
-            String adjustCount = String.valueOf(logs.size());
-            // 构建调整记录摘要：操作类型 + 操作人 + 操作时间
+            // 调整次数 = 非新增操作（UPDATE/DELETE）次数；新增不计入“调整”
+            long adjustCount = logs.stream()
+                    .filter(l -> l.getAction() != null && !l.getAction().toUpperCase().startsWith("CREATE"))
+                    .count();
+            // 构建调整记录摘要：操作类型 + 操作人 + 操作时间（归档前缀不展示）
             String adjustRecords = logs.stream()
                     .map(l -> String.format("[%s] %s %s",
-                            l.getAction() != null ? l.getAction() : "",
+                            l.getAction() != null ? l.getAction().replaceFirst("^ARCHIVED_", "") : "",
                             l.getOperator() != null ? l.getOperator() : "",
                             l.getOperateTime() != null ? l.getOperateTime().toLocalDate().toString() : ""))
                     .collect(Collectors.joining("; "));
@@ -97,7 +100,7 @@ public class ReportController {
                     a.getEndDate() != null ? a.getEndDate().toString() : "",
                     a.getDailyHours() != null ? a.getDailyHours().toString() : "",
                     a.getVersion() != null ? a.getVersion().toString() : "",
-                    adjustCount,
+                    String.valueOf(adjustCount),
                     adjustRecords
             ));
         }
