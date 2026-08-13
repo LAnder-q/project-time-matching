@@ -2,18 +2,9 @@
 -- 人员-项目时间匹配管理工具 数据库初始化脚本
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS pm_tool DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE pm_tool;
-
 -- ============================================================
 -- 部门表 department（支持层级，parent_id 自引用）
 -- ============================================================
-DROP TABLE IF EXISTS assignment;
-DROP TABLE IF EXISTS operation_log;
-DROP TABLE IF EXISTS project;
-DROP TABLE IF EXISTS personnel;
-DROP TABLE IF EXISTS department;
-DROP TABLE IF EXISTS sys_user;
 
 CREATE TABLE department (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

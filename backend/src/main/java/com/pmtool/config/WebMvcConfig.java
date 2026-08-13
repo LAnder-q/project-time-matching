@@ -22,6 +22,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/auth/login",    // 登录接口
+                        "/version",       // 版本信息接口（无需登录）
                         "/error",         // Spring Boot 错误页
                         "/favicon.ico"
                 );
