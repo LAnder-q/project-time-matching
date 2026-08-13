@@ -2,6 +2,13 @@
 
 本项目所有重要变更都会记录在此文件，格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本（SemVer）。
 
+## [Unreleased]
+
+### Added
+
+- 核心逻辑单元测试：冲突检测、智能替换推荐、登录认证、数据加密、Excel 导入校验
+- GitHub Actions CI：每次推送自动编译后端、运行单元测试、构建前端
+
 ## [1.1.0] - 2026-08-13
 
 ### Added
